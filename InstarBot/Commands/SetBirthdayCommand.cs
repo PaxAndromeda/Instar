@@ -30,6 +30,14 @@ public class SetBirthdayCommand(IInstarDDBService ddbService, IMetricService met
         [Autocomplete]
         int tzOffset = 0)
     {
+        if ((int)month is < 0 or > 12)
+        {
+            await RespondAsync(
+                "There are only 12 months in a year.  Your birthday was not set.",
+                ephemeral: true);
+            return;
+        }
+
         var daysInMonth = DateTime.DaysInMonth(year, (int)month);
 
         // First step:  Does the provided number of days exceed the number of days in the given month?
@@ -41,8 +49,11 @@ public class SetBirthdayCommand(IInstarDDBService ddbService, IMetricService met
             return;
         }
 
-        var dtLocal = new DateTime(year, (int)month, day, 0, 0, 0, DateTimeKind.Unspecified);
-        var dtUtc = new DateTime(year, (int)month, day, 0, 0, 0, DateTimeKind.Utc).AddHours(-tzOffset);
+        var unspecifiedDate = new DateTime(year, (int)month, day, 0, 0, 0, DateTimeKind.Unspecified);
+        var dtZ = new DateTimeOffset(unspecifiedDate, TimeSpan.FromHours(tzOffset));
+
+        var dtLocal = dtZ.DateTime;
+        var dtUtc = dtZ.UtcDateTime;
 
         // Second step:  Is the provided birthday actually in the future?
         if (dtUtc > DateTime.UtcNow)
