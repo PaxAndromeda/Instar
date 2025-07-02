@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Discord;
 using InstarBot.Tests.Models;
 using Moq;
@@ -7,7 +6,6 @@ using PaxAndromeda.Instar.Gaius;
 
 namespace InstarBot.Tests;
 
-[SuppressMessage("ReSharper", "AutoPropertyCanBeMadeGetOnly.Global")]
 public sealed class TestContext
 {
     public ulong UserID { get; init; } = 1420070400100;
@@ -22,28 +20,26 @@ public sealed class TestContext
 
     public List<IGuildUser> GuildUsers { get; init; } = [];
 
-    public Dictionary<Snowflake, TestChannel> Channels { get; init; } = new();
-    public Dictionary<Snowflake, TestRole> Roles { get; init; } = new();
+    public Dictionary<Snowflake, TestChannel> Channels { get; init; } = [];
+    public Dictionary<Snowflake, TestRole> Roles { get; init; } = [];
 
-    public Dictionary<Snowflake, List<Warning>> Warnings { get; init; } = new();
-    public Dictionary<Snowflake, List<Caselog>> Caselogs { get; init; } = new();
+    public Dictionary<Snowflake, List<Warning>> Warnings { get; init; } = [];
+    public Dictionary<Snowflake, List<Caselog>> Caselogs { get; init; } = [];
 
     public bool InhibitGaius { get; set; }
 
     public void AddWarning(Snowflake userId, Warning warning)
     {
-        if (!Warnings.ContainsKey(userId))
-            Warnings.Add(userId, [warning]);
-        else
-            Warnings[userId].Add(warning);
+        if (!Warnings.TryGetValue(userId, out var list))
+            Warnings[userId] = list = [];
+        list.Add(warning);
     }
 
     public void AddCaselog(Snowflake userId, Caselog caselog)
     {
-        if (!Caselogs.ContainsKey(userId))
-            Caselogs.Add(userId, [caselog]);
-        else
-            Caselogs[userId].Add(caselog);
+        if (!Caselogs.TryGetValue(userId, out var list))
+            Caselogs[userId] = list = [];
+        list.Add(caselog);
     }
     
     public void AddChannel(Snowflake channelId)
