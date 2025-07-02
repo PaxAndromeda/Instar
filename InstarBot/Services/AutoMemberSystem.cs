@@ -279,7 +279,7 @@ public sealed class AutoMemberSystem
         if (!_introductionPosters.ContainsKey(user.Id))
             eligibility |=  MembershipEligibility.MissingIntroduction;
 
-        if (!_recentMessages.ContainsKey(user.Id) || _recentMessages[user.Id] < cfg.AutoMemberConfig.MinimumMessages)
+        if (_recentMessages.TryGetValue(user.Id, out int messages) && messages < cfg.AutoMemberConfig.MinimumMessages)
             eligibility |=  MembershipEligibility.NotEnoughMessages;
 
         if (_punishedUsers.ContainsKey(user.Id))
@@ -306,13 +306,11 @@ public sealed class AutoMemberSystem
 
     private Dictionary<ulong, int> GetMessagesSent()
     {
-        var map = new Dictionary<ulong, int>();
-
-        foreach (var cacheEntry in _messageCache)
-        {
-            if (!map.TryAdd(cacheEntry.Value.UserID, 1))
-                map[cacheEntry.Value.UserID]++;
-        }
+        var map = this._messageCache
+            .Cast<KeyValuePair<string, MessageProperties>>() // Cast to access LINQ extensions
+            .Select(entry => entry.Value)
+            .GroupBy(properties => properties.UserID)
+            .ToDictionary(group => group.Key, group => group.Count());
 
         return map;
     }
@@ -347,24 +345,36 @@ public sealed class AutoMemberSystem
     {
         if (await _discord.GetChannel(cfg.AutoMemberConfig.IntroductionChannel) is not ITextChannel introChannel)
             throw new InvalidOperationException("Introductions channel not found");
-        
-        var messages = (await introChannel.GetMessagesAsync().FlattenAsync()).ToList();
+
+        var messages = (await introChannel.GetMessagesAsync().FlattenAsync()).GetEnumerator();
 
         // Assumption:  Last message is the oldest one
-        while (messages.Count > 0)
+        while (messages.MoveNext()) // Move to the first message, if there is any
         {
-            var oldestMessage = messages[0];
-            foreach (var message in messages)
+            IMessage? message;
+            IMessage? oldestMessage = null;
+
+            do
             {
+                message = messages.Current;
+                if (message is null)
+                    break;
+
                 if (message.Author is IGuildUser sgUser && sgUser.RoleIds.Contains(cfg.MemberRoleID.ID))
                     continue;
-                
-                _introductionPosters.TryAdd(message.Author.Id, true);
-                if (message.Timestamp < oldestMessage.Timestamp)
-                    oldestMessage = message;
-            }
 
-            messages = (await introChannel.GetMessagesAsync(oldestMessage, Direction.Before).FlattenAsync()).ToList();
+                _introductionPosters.TryAdd(message.Author.Id, true);
+
+                if (oldestMessage is null || message.Timestamp < oldestMessage.Timestamp)
+                    oldestMessage = message;
+            } while (messages.MoveNext());
+
+            if (message is null || oldestMessage is null)
+                break;
+
+            messages = (await introChannel.GetMessagesAsync(oldestMessage, Direction.Before).FlattenAsync()).GetEnumerator();
         }
+
+        messages.Dispose();
     }
 }
