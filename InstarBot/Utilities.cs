@@ -19,11 +19,7 @@ public static class Utilities
     {
         var type = enumVal.GetType();
         var membersInfo = type.GetMember(enumVal.ToString());
-        if (membersInfo.Length == 0)
-            return null;
-
-        var attr = membersInfo[0].GetCustomAttribute(typeof(T), false);
-        return attr as T;
+        return membersInfo.Length == 0 ? null : membersInfo[0].GetCustomAttribute<T>(false);
     }
 
     public static string Remove(this string text, Range range)

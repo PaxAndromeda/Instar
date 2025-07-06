@@ -9,14 +9,14 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public class SetBirthdayCommandTests
+public static class SetBirthdayCommandTests
 {
     private static (IInstarDDBService, Mock<SetBirthdayCommand>) SetupMocks(SetBirthdayContext context)
     {
         var ddbService = TestUtilities.GetServices().GetService<IInstarDDBService>();
         var cmd = TestUtilities.SetupCommandMock(() => new SetBirthdayCommand(ddbService!, new MockMetricService()), new TestContext
         {
-            UserID = context.User.ID,
+            UserID = context.User.ID
         });
 
         Assert.NotNull(ddbService);

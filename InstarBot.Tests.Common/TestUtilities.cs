@@ -12,7 +12,6 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.Services;
-using Xunit;
 
 namespace InstarBot.Tests;
 
@@ -62,37 +61,6 @@ public static class TestUtilities
         sc.AddSingleton(GetDynamicConfiguration());
 
         return sc.BuildServiceProvider();
-    }
-
-    /// <summary>
-    /// Provides a method for verifying messages with an ambiguous Mock type.
-    /// </summary>
-    /// <param name="mockObject">A mockup of the command.</param>
-    /// <param name="message">The message to search for.</param>
-    /// <param name="ephemeral">A flag indicating whether the message should be ephemeral.</param>
-    public static void VerifyMessage(object mockObject, string message, bool ephemeral = false)
-    {
-        // A few checks first
-        var mockObjectType = mockObject.GetType();
-        Assert.Equal(nameof(Mock), mockObjectType.Name[..mockObjectType.Name.LastIndexOf('`')]);
-        Assert.Single(mockObjectType.GenericTypeArguments);
-        var commandType = mockObjectType.GenericTypeArguments[0];
-
-        var genericVerifyMessage = typeof(TestUtilities)
-            .GetMethods()
-            .Where(n => n.Name == nameof(VerifyMessage))
-            .Select(m => new
-            {
-                Method = m,
-                Params = m.GetParameters(),
-                Args = m.GetGenericArguments()
-            })
-            .Where(x => x.Args.Length == 1)
-            .Select(x => x.Method)
-            .First();
-
-        var specificMethod = genericVerifyMessage.MakeGenericMethod(commandType);
-        specificMethod.Invoke(null, [mockObject, message, ephemeral]);
     }
 
     /// <summary>
@@ -167,7 +135,7 @@ public static class TestUtilities
             .Returns(Task.CompletedTask);
     }
 
-    public static Mock<InstarContext> SetupContext(TestContext? context)
+    public static Mock<InstarContext> SetupContext(TestContext context)
     {
         var mock = new Mock<InstarContext>();
 
@@ -184,7 +152,7 @@ public static class TestUtilities
         context.Should().NotBeNull();
 
         var guildMock = new Mock<IInstarGuild>();
-        guildMock.Setup(n => n.Id).Returns(context.GuildID);
+        guildMock.Setup(n => n.Id).Returns(TestContext.GuildID);
         guildMock.Setup(n => n.GetTextChannel(It.IsAny<ulong>()))
             .Returns(context.TextChannelMock.Object);
 
@@ -220,10 +188,10 @@ public static class TestUtilities
         return channelMock;
     }
 
-    private static Mock<T> SetupChannelMock<T>(TestContext? context)
+    private static Mock<T> SetupChannelMock<T>(TestContext context)
         where T : class, IChannel
     {
-        var channelMock = SetupChannelMock<T>(context!.ChannelID);
+        var channelMock = SetupChannelMock<T>(TestContext.ChannelID);
 
         if (typeof(T) != typeof(ITextChannel))
             return channelMock;
@@ -263,7 +231,7 @@ public static class TestUtilities
 
         foreach (var internalId in teamRefs)
         {
-            if (!teamsConfig.TryGetValue(internalId, out Team? value))
+            if (!teamsConfig.TryGetValue(internalId, out var value))
                 throw new KeyNotFoundException("Failed to find team with internal ID " + internalId);
 
             yield return value;

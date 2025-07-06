@@ -91,7 +91,7 @@ public class CheckEligibilityCommand(
             foreach (var roleGroup in config.AutoMemberConfig.RequiredRoles)
             {
                 if (user.RoleIds.Intersect(roleGroup.Roles.Select(n => n.ID)).Any()) continue;
-                var prefix = "aeiouAEIOU".IndexOf(roleGroup.GroupName[0]) >= 0 ? "an" : "a"; // grammar hack :)
+                var prefix = "aeiouAEIOU".Contains(roleGroup.GroupName[0]) ? "an" : "a"; // grammar hack :)
                 missingItemsBuilder.AppendLine(
                     $"- You are missing {prefix} {roleGroup.GroupName.ToLowerInvariant()} role.");
             }

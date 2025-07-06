@@ -16,8 +16,8 @@ public sealed class TestMessage : IMessage
         Content = message;
     }
 
-    public ulong Id { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
+    public ulong Id { get; }
+    public DateTimeOffset CreatedAt { get; }
 
     public Task DeleteAsync(RequestOptions options = null!)
     {
@@ -54,34 +54,34 @@ public sealed class TestMessage : IMessage
         throw new NotImplementedException();
     }
 
-    public MessageType Type { get; set; } = default;
-    public MessageSource Source { get; set; } = default;
-    public bool IsTTS { get; set; } = false;
-    public bool IsPinned { get; set; } = false;
-    public bool IsSuppressed { get; set; } = false;
-    public bool MentionedEveryone { get; set; } = false;
-    public string Content { get; set; }
-    public string CleanContent { get; set; } = null!;
-    public DateTimeOffset Timestamp { get; set; }
-    public DateTimeOffset? EditedTimestamp { get; set; } = null;
-    public IMessageChannel Channel { get; set; } = null!;
-    public IUser Author { get; set; }
-    public IThreadChannel Thread { get; set; } = null!;
-    public IReadOnlyCollection<IAttachment> Attachments { get; set; } = null!;
-    public IReadOnlyCollection<IEmbed> Embeds { get; set; } = null!;
-    public IReadOnlyCollection<ITag> Tags { get; set; } = null!;
-    public IReadOnlyCollection<ulong> MentionedChannelIds { get; set; } = null!;
-    public IReadOnlyCollection<ulong> MentionedRoleIds { get; set; } = null!;
-    public IReadOnlyCollection<ulong> MentionedUserIds { get; set; } = null!;
-    public MessageActivity Activity { get; set; } = null!;
-    public MessageApplication Application { get; set; } = null!;
-    public MessageReference Reference { get; set; } = null!;
-    public IReadOnlyDictionary<IEmote, ReactionMetadata> Reactions { get; set; } = null!;
-    public IReadOnlyCollection<IMessageComponent> Components { get; set; } = null!;
-    public IReadOnlyCollection<IStickerItem> Stickers { get; set; } = null!;
-    public MessageFlags? Flags { get; set; } = null;
-    public IMessageInteraction Interaction { get; set; } = null!;
-    public MessageRoleSubscriptionData RoleSubscriptionData { get; set; } = null!;
+    public MessageType Type => default;
+    public MessageSource Source => default;
+    public bool IsTTS => false;
+    public bool IsPinned => false;
+    public bool IsSuppressed => false;
+    public bool MentionedEveryone => false;
+    public string Content { get; }
+    public string CleanContent => null!;
+    public DateTimeOffset Timestamp { get; }
+    public DateTimeOffset? EditedTimestamp => null;
+    public IMessageChannel Channel => null!;
+    public IUser Author { get; }
+    public IThreadChannel Thread => null!;
+    public IReadOnlyCollection<IAttachment> Attachments => null!;
+    public IReadOnlyCollection<IEmbed> Embeds => null!;
+    public IReadOnlyCollection<ITag> Tags => null!;
+    public IReadOnlyCollection<ulong> MentionedChannelIds => null!;
+    public IReadOnlyCollection<ulong> MentionedRoleIds => null!;
+    public IReadOnlyCollection<ulong> MentionedUserIds => null!;
+    public MessageActivity Activity => null!;
+    public MessageApplication Application => null!;
+    public MessageReference Reference => null!;
+    public IReadOnlyDictionary<IEmote, ReactionMetadata> Reactions => null!;
+    public IReadOnlyCollection<IMessageComponent> Components => null!;
+    public IReadOnlyCollection<IStickerItem> Stickers => null!;
+    public MessageFlags? Flags => null;
+    public IMessageInteraction Interaction => null!;
+    public MessageRoleSubscriptionData RoleSubscriptionData => null!;
 
     public PurchaseNotification PurchaseNotification => throw new NotImplementedException();
 

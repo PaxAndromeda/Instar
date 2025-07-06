@@ -9,7 +9,7 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public sealed class ReportUserTests
+public static class ReportUserTests
 {
     [Fact(DisplayName = "User should be able to report a message normally")]
     public static async Task ReportUser_WhenReportingNormally_ShouldNotifyStaff()
@@ -76,7 +76,7 @@ public sealed class ReportUserTests
         var commandMockContext = new TestContext
         {
             UserID = context.User,
-            EmbedCallback = embed => context.ResultEmbed = embed,
+            EmbedCallback = embed => context.ResultEmbed = embed
         };
 
         var commandMock =

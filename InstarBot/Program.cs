@@ -112,7 +112,7 @@ internal static class Program
         Log.Fatal(e.ExceptionObject as Exception, "FATAL: Unhandled exception caught");
     }
 
-    private static IServiceProvider ConfigureServices(IConfiguration config)
+    private static ServiceProvider ConfigureServices(IConfiguration config)
     {
         var services = new ServiceCollection();
 

@@ -3,7 +3,7 @@
 namespace InstarBot.Tests.Integration.Interactions;
 using Xunit;
 
-public sealed class PingCommandTests
+public static class PingCommandTests
 {
     /// <summary>
     /// Tests that the ping command emits an ephemeral "Pong!" response.
