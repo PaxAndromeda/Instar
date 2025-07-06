@@ -97,7 +97,7 @@ public class PageCommand(TeamService teamService, IMetricService metricService) 
             return true;
 
         // Check permissions.  Only mod+ can send an "all" page
-        if (team.Priority > 3 && pageTarget == PageTarget.All) // i.e. Helper
+        if (team.Priority > 3 && pageTarget == PageTarget.All) // i.e. Helper, Community Manager
         {
             response = "You are not authorized to send a page to the entire staff team.";
             Log.Information("{User} was not authorized to send a page to the entire staff team", user.Id);

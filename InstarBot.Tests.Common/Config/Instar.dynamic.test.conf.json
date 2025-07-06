@@ -93,6 +93,14 @@
       "Teamleader": 459078815314870283,
       "Color": 13532979,
       "Priority": 4
+    },
+    {
+      "InternalID": "fe434e9a-2a69-41b6-a297-24e26ba4aebe",
+      "Name": "Community Manager",
+      "ID": 957411837920567356,
+      "Teamleader": 340546691491168257,
+      "Color": 10892756,
+      "Priority": 5
     }
   ]
 }
