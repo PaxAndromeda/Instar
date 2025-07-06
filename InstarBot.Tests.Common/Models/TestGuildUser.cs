@@ -142,6 +142,16 @@ public sealed class TestGuildUser : IGuildUser
         throw new NotImplementedException();
     }
 
+    public string GetGuildBannerUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string GetAvatarDecorationUrl()
+    {
+        throw new NotImplementedException();
+    }
+
     public DateTimeOffset? JoinedAt { get; init; }
     public string DisplayName { get; set; } = null!;
     public string Nickname { get; set; } = null!;
@@ -167,4 +177,12 @@ public sealed class TestGuildUser : IGuildUser
     /// Test flag indicating the user has been changed.
     /// </summary>
     public bool Changed { get; private set; }
+
+    public string GuildBannerHash => throw new NotImplementedException();
+
+    public string GlobalName => throw new NotImplementedException();
+
+    public string AvatarDecorationHash => throw new NotImplementedException();
+
+    public ulong? AvatarDecorationSkuId => throw new NotImplementedException();
 }

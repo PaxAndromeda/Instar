@@ -49,8 +49,15 @@ internal static class Program
 
     private static async void StopSystem(object? sender, ConsoleCancelEventArgs e)
     {
-        await _services.GetRequiredService<DiscordService>().Stop();
-        _cts.Cancel();
+        try
+        {
+            await _services.GetRequiredService<DiscordService>().Stop();
+            await _cts.CancelAsync();
+        }
+        catch (Exception err)
+        {
+            Log.Fatal(err, "FATAL: Unhandled exception caught during shutdown");
+        }
     }
 
     private static async Task RunAsync(IConfiguration config)

@@ -7,11 +7,11 @@ namespace InstarBot.Tests.Models;
 public class TestGuild : IInstarGuild
 {
     public ulong Id { get; init; }
-    public IEnumerable<ITextChannel> TextChannels { get; init; } = default!;
+    public IEnumerable<ITextChannel> TextChannels { get; init; } = null!;
 
-    public IEnumerable<IRole> Roles { get; init; } = default!;
+    public IEnumerable<IRole> Roles { get; init; } = null!;
 
-    public IEnumerable<IGuildUser> Users { get; init; } = default!;
+    public IEnumerable<IGuildUser> Users { get; init; } = null!;
 
     public virtual ITextChannel GetTextChannel(ulong channelId)
     {

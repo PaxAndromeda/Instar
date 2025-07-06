@@ -73,7 +73,7 @@ public sealed class InstarDDBService : IInstarDDBService
     private async Task<bool> UpdateUserData<T>(Snowflake snowflake, DataType dataType, T data)
         where T : DynamoDBEntry
     {
-        var table = Table.LoadTable(_client, TableName);
+        var table = new TableBuilder(_client, TableName).Build();
 
         var updateData = new Document(new Dictionary<string, DynamoDBEntry>
         {
@@ -92,7 +92,7 @@ public sealed class InstarDDBService : IInstarDDBService
 
     private async Task<DynamoDBEntry?> GetUserData(Snowflake snowflake, DataType dataType)
     {
-        var table = Table.LoadTable(_client, TableName);
+        var table = new TableBuilder(_client, TableName).Build();
         var scan = table.Query(new Primitive(snowflake.ID.ToString()), new QueryFilter());
         
         var results = await scan.GetRemainingAsync();

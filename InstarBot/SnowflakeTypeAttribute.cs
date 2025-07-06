@@ -1,12 +1,7 @@
 namespace PaxAndromeda.Instar;
 
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
-public sealed class SnowflakeTypeAttribute : Attribute
+public sealed class SnowflakeTypeAttribute(SnowflakeType type) : Attribute
 {
-    public SnowflakeType Type { get; }
-
-    public SnowflakeTypeAttribute(SnowflakeType type)
-    {
-        Type = type;
-    }
+    public SnowflakeType Type { get; } = type;
 }

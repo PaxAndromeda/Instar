@@ -9,14 +9,9 @@ namespace PaxAndromeda.Instar.Wrappers;
 /// </summary>
 [ExcludeFromCodeCoverage(Justification = "Wrapper class")]
 [SuppressMessage("ReSharper", "ClassWithVirtualMembersNeverInherited.Global")]
-public class SocketGuildWrapper : IInstarGuild
+public class SocketGuildWrapper(SocketGuild guild) : IInstarGuild
 {
-    private readonly SocketGuild _guild;
-
-    public SocketGuildWrapper(SocketGuild guild)
-    {
-        _guild = guild ?? throw new ArgumentNullException(nameof(guild));
-    }
+    private readonly SocketGuild _guild = guild ?? throw new ArgumentNullException(nameof(guild));
 
     public virtual ulong Id => _guild.Id;
     public IEnumerable<ITextChannel> TextChannels => _guild.TextChannels;

@@ -6,7 +6,7 @@ namespace InstarBot.Tests.Services;
 
 public sealed class MockMetricService : IMetricService
 {
-    private readonly List<(Metric, double)> _emittedMetrics = new();
+    private readonly List<(Metric, double)> _emittedMetrics = [];
     
     public Task<bool> Emit(Metric metric, double value)
     {

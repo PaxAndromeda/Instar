@@ -7,46 +7,39 @@ namespace PaxAndromeda.Instar.Services;
 
 [SuppressMessage("ReSharper", "UnusedMember.Global")]
 [SuppressMessage("ReSharper", "MemberCanBePrivate.Global")]
-public sealed class TeamService
+public sealed class TeamService(IDynamicConfigService dynamicConfig)
 {
-    private readonly IDynamicConfigService _dynamicConfig;
-
-    public TeamService(IDynamicConfigService dynamicConfig)
-    {
-        _dynamicConfig = dynamicConfig;
-    }
-
     public async Task<bool> Exists(string teamRef)
     {
-        var cfg = await _dynamicConfig.GetConfig();
+        var cfg = await dynamicConfig.GetConfig();
         
         return cfg.Teams.Any(n => n.InternalID.Equals(teamRef, StringComparison.Ordinal));
     }
 
     public async Task<bool> Exists(Snowflake snowflake)
     {
-        var cfg = await _dynamicConfig.GetConfig();
+        var cfg = await dynamicConfig.GetConfig();
         
         return cfg.Teams.Any(n => n.ID.ID == snowflake.ID);
     }
 
     public async Task<Team> Get(string teamRef)
     {
-        var cfg = await _dynamicConfig.GetConfig();
+        var cfg = await dynamicConfig.GetConfig();
         
         return cfg.Teams.First(n => n.InternalID.Equals(teamRef, StringComparison.Ordinal));
     }
 
     public async Task<Team> Get(Snowflake snowflake)
     {
-        var cfg = await _dynamicConfig.GetConfig();
+        var cfg = await dynamicConfig.GetConfig();
         
         return cfg.Teams.First(n => n.ID.ID == snowflake.ID);
     }
 
     public async IAsyncEnumerable<Team> GetTeams(PageTarget pageTarget)
     {
-        var cfg = await _dynamicConfig.GetConfig();
+        var cfg = await dynamicConfig.GetConfig();
         var teamRefs = pageTarget.GetAttributesOfType<TeamRefAttribute>()?.Select(n => n.InternalID) ??
                        new List<string>();
 

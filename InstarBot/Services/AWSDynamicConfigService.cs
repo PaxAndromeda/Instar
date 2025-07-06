@@ -111,7 +111,7 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
             });
 
             _nextToken = result.NextPollConfigurationToken;
-            _nextPollTime = DateTime.UtcNow + TimeSpan.FromSeconds(result.NextPollIntervalInSeconds);
+            _nextPollTime = DateTime.UtcNow + TimeSpan.FromSeconds((double)(result.NextPollIntervalInSeconds ?? 60));
             
             // Per the documentation, if VersionLabel is empty, then the client
             // has the most up-to-date configuration already stored.  We can stop

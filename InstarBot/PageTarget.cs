@@ -1,5 +1,4 @@
-﻿using Discord.Interactions;
-using JetBrains.Annotations;
+﻿using JetBrains.Annotations;
 
 namespace PaxAndromeda.Instar;
 

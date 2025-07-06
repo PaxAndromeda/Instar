@@ -4,25 +4,18 @@ using System.Text;
 
 namespace PaxAndromeda.Instar.Services;
 
-public sealed class GaiusAPIService : IGaiusAPIService
+public sealed class GaiusAPIService(IDynamicConfigService config) : IGaiusAPIService
 {
     // Used in release mode
     // ReSharper disable once NotAccessedField.Local
-    private readonly IDynamicConfigService _config;
     private const string BaseURL = "https://api.gaiusbot.me";
     private const string WarningsBaseURL = BaseURL + "/warnings";
     private const string CaselogsBaseURL = BaseURL + "/caselogs";
     
-    private readonly HttpClient _client;
+    private readonly HttpClient _client = new();
     private string _apiKey = null!;
     private bool _initialized;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
-    
-    public GaiusAPIService(IDynamicConfigService config)
-    {
-        _config = config;
-        _client = new HttpClient();
-    }
 
     private async Task Initialize()
     {
@@ -35,7 +28,7 @@ public sealed class GaiusAPIService : IGaiusAPIService
             if (_initialized)
                 return;
 
-            _apiKey = await _config.GetParameter("GaiusKey") ??
+            _apiKey = await config.GetParameter("GaiusKey") ??
                       throw new ConfigurationException("Could not acquire Gaius API key");
             await VerifyKey();
             _initialized = true;
@@ -48,7 +41,7 @@ public sealed class GaiusAPIService : IGaiusAPIService
     
     private async Task VerifyKey()
     {
-        var cfg = await _config.GetConfig();
+        var cfg = await config.GetConfig();
         
         var targetGuild = cfg.TargetGuild;
         var keyData = Encoding.UTF8.GetString(Convert.FromBase64String(_apiKey));
@@ -72,7 +65,7 @@ public sealed class GaiusAPIService : IGaiusAPIService
         var response = await Get($"{WarningsBaseURL}/all");
 
         var result = JsonConvert.DeserializeObject<Warning[]>(response);
-        return result ?? Array.Empty<Warning>();
+        return result ?? [];
     }
     
     public async Task<IEnumerable<Caselog>> GetAllCaselogs()
@@ -90,7 +83,7 @@ public sealed class GaiusAPIService : IGaiusAPIService
         var response = await Get($"{WarningsBaseURL}/after/{dt:O}");
 
         var result = JsonConvert.DeserializeObject<Warning[]>(response);
-        return result ?? Array.Empty<Warning>();
+        return result ?? [];
     }
 
     public async Task<IEnumerable<Caselog>> GetCaselogsAfter(DateTime dt)
@@ -119,9 +112,11 @@ public sealed class GaiusAPIService : IGaiusAPIService
 
     private static IEnumerable<Caselog> ParseCaselogs(string response)
     {
-        // Remove the "totalCases" portion if it exists
-        if (response.Contains("totalCases", StringComparison.OrdinalIgnoreCase))
-            response = response[..(response.LastIndexOf("\"totalCases\"", StringComparison.OrdinalIgnoreCase)-1)] + "}";
+        // Remove any instances of "totalCases"
+        while (response.Contains("\"totalcases\":", StringComparison.OrdinalIgnoreCase))
+        {
+            var start = response.IndexOf("\"totalcases\":", StringComparison.OrdinalIgnoreCase); 
+            var end = response.IndexOfAny([',', '}'], start);
 
         if (response.Length <= 2)
             yield break;

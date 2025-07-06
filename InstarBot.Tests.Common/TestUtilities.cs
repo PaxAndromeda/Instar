@@ -65,9 +65,9 @@ public static class TestUtilities
     }
 
     /// <summary>
-    /// Provides an method for verifying messages with an ambiguous Mock type.
+    /// Provides a method for verifying messages with an ambiguous Mock type.
     /// </summary>
-    /// <param name="mockObject">The mock of the command.</param>
+    /// <param name="mockObject">A mockup of the command.</param>
     /// <param name="message">The message to search for.</param>
     /// <param name="ephemeral">A flag indicating whether the message should be ephemeral.</param>
     public static void VerifyMessage(object mockObject, string message, bool ephemeral = false)
@@ -92,13 +92,13 @@ public static class TestUtilities
             .First();
 
         var specificMethod = genericVerifyMessage.MakeGenericMethod(commandType);
-        specificMethod.Invoke(null, new[] { mockObject, message, ephemeral });
+        specificMethod.Invoke(null, [mockObject, message, ephemeral]);
     }
 
     /// <summary>
     /// Verifies that the command responded to the user with the correct <paramref name="message"/>.
     /// </summary>
-    /// <param name="command">The mock of the command.</param>
+    /// <param name="command">A mockup of the command.</param>
     /// <param name="message">The message to check for.</param>
     /// <param name="ephemeral">A flag indicating whether the message should be ephemeral.</param>
     /// <typeparam name="T">The type of command.  Must implement <see cref="InteractionModuleBase&lt;T&gt;"/>.</typeparam>
@@ -109,7 +109,7 @@ public static class TestUtilities
             "RespondAsync", Times.Once(),
             message, ItExpr.IsAny<Embed[]>(),
             false, ephemeral, ItExpr.IsAny<AllowedMentions>(), ItExpr.IsAny<RequestOptions>(),
-            ItExpr.IsAny<MessageComponent>(), ItExpr.IsAny<Embed>());
+            ItExpr.IsAny<MessageComponent>(), ItExpr.IsAny<Embed>(), ItExpr.IsAny<PollProperties>());
     }
 
     public static IDiscordService SetupDiscordService(TestContext context = null!)
@@ -118,7 +118,7 @@ public static class TestUtilities
     public static IGaiusAPIService SetupGaiusAPIService(TestContext context = null!)
         => new MockGaiusAPIService(context.Warnings, context.Caselogs, context.InhibitGaius);
 
-    private static IInstarGuild SetupGuild(TestContext context = null!)
+    private static TestGuild SetupGuild(TestContext context = null!)
     {
         var guild = new TestGuild
         {
@@ -162,7 +162,8 @@ public static class TestUtilities
                 It.IsAny<bool>(),
                 It.IsAny<bool>(), ItExpr.IsNull<AllowedMentions>(), ItExpr.IsNull<RequestOptions>(),
                 ItExpr.IsNull<MessageComponent>(),
-                ItExpr.IsNull<Embed>())
+                ItExpr.IsNull<Embed>(),
+                ItExpr.IsNull<PollProperties>())
             .Returns(Task.CompletedTask);
     }
 
@@ -170,10 +171,10 @@ public static class TestUtilities
     {
         var mock = new Mock<InstarContext>();
 
-        mock.SetupGet<IGuildUser>(n => n.User!).Returns(SetupUserMock<IGuildUser>(context).Object);
-        mock.SetupGet<IGuildChannel>(n => n.Channel!).Returns(SetupChannelMock<ITextChannel>(context).Object);
+        mock.SetupGet(static n => n.User!).Returns(SetupUserMock<IGuildUser>(context).Object);
+        mock.SetupGet(static n => n.Channel!).Returns(SetupChannelMock<ITextChannel>(context).Object);
         // Note: The following line must occur after the mocking of GetChannel.
-        mock.SetupGet<IInstarGuild>(n => n.Guild).Returns(SetupGuildMock(context).Object);
+        mock.SetupGet(static n => n.Guild).Returns(SetupGuildMock(context).Object);
 
         return mock;
     }
@@ -183,7 +184,7 @@ public static class TestUtilities
         context.Should().NotBeNull();
 
         var guildMock = new Mock<IInstarGuild>();
-        guildMock.Setup(n => n.Id).Returns(context!.GuildID);
+        guildMock.Setup(n => n.Id).Returns(context.GuildID);
         guildMock.Setup(n => n.GetTextChannel(It.IsAny<ulong>()))
             .Returns(context.TextChannelMock.Object);
 
@@ -230,12 +231,16 @@ public static class TestUtilities
         channelMock.As<ITextChannel>().Setup(n => n.SendMessageAsync(It.IsAny<string>(), It.IsAny<bool>(),
                 It.IsAny<Embed>(),
                 It.IsAny<RequestOptions>(),
-                It.IsAny<AllowedMentions>(), It.IsAny<MessageReference>(), It.IsAny<MessageComponent>(),
+                It.IsAny<AllowedMentions>(),
+                It.IsAny<MessageReference>(),
+                It.IsAny<MessageComponent>(),
                 It.IsAny<ISticker[]>(),
-                It.IsAny<Embed[]>(), It.IsAny<MessageFlags>()))
+                It.IsAny<Embed[]>(),
+                It.IsAny<MessageFlags>(),
+                It.IsAny<PollProperties>()))
             .Callback((string _, bool _, Embed embed, RequestOptions _, AllowedMentions _,
                 MessageReference _, MessageComponent _, ISticker[] _, Embed[] _,
-                MessageFlags _) =>
+                MessageFlags _, PollProperties _) =>
             {
                 context.EmbedCallback(embed);
             })
@@ -254,14 +259,14 @@ public static class TestUtilities
         teamsConfig.Should().NotBeNull();
 
         var teamRefs = pageTarget.GetAttributesOfType<TeamRefAttribute>()?.Select(n => n.InternalID) ??
-                       new List<string>();
+                       [];
 
         foreach (var internalId in teamRefs)
         {
-            if (!teamsConfig.ContainsKey(internalId))
+            if (!teamsConfig.TryGetValue(internalId, out Team? value))
                 throw new KeyNotFoundException("Failed to find team with internal ID " + internalId);
 
-            yield return teamsConfig[internalId];
+            yield return value;
         }
     }
 }

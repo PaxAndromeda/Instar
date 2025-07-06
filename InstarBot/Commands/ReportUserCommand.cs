@@ -11,10 +11,8 @@ namespace PaxAndromeda.Instar.Commands;
 
 // Required to be unsealed for mocking
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class ReportUserCommand : BaseCommand, IContextCommand
+public class ReportUserCommand(IDynamicConfigService dynamicConfig, IMetricService metricService) : BaseCommand, IContextCommand
 {
-    private readonly IDynamicConfigService _dynamicConfig;
-    private readonly IMetricService _metricService;
     private const string ModalId = "respond_modal";
 
     private static readonly MemoryCache Cache = new("User Report Cache");
@@ -23,12 +21,6 @@ public class ReportUserCommand : BaseCommand, IContextCommand
     {
         foreach (var n in Cache)
             Cache.Remove(n.Key, CacheEntryRemovedReason.Removed);
-    }
-
-    public ReportUserCommand(IDynamicConfigService dynamicConfig, IMetricService metricService)
-    {
-        _dynamicConfig = dynamicConfig;
-        _metricService = metricService;
     }
 
     [ExcludeFromCodeCoverage(Justification = "Constant used for mapping")]
@@ -59,9 +51,9 @@ public class ReportUserCommand : BaseCommand, IContextCommand
     [ModalInteraction(ModalId)]
     public async Task ModalResponse(ReportMessageModal modal)
     {
-        var message = (IMessage)Cache.Get(Context.User!.Id.ToString());
+        var message = (IMessage?) Cache.Get(Context.User!.Id.ToString());
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-        if (message == null)
+        if (message is null)
         {
             await RespondAsync("Report expired.  Please try again.", ephemeral: true);
             return;
@@ -74,7 +66,7 @@ public class ReportUserCommand : BaseCommand, IContextCommand
 
     private async Task SendReportMessage(ReportMessageModal modal, IMessage message, IInstarGuild guild)
     {
-        var cfg = await _dynamicConfig.GetConfig();
+        var cfg = await dynamicConfig.GetConfig();
         
         var fields = new List<EmbedFieldBuilder>
         {
@@ -124,6 +116,6 @@ public class ReportUserCommand : BaseCommand, IContextCommand
             Context.Guild.GetTextChannel(cfg.StaffAnnounceChannel)
                 .SendMessageAsync(staffPing, embed: builder.Build());
 
-        await _metricService.Emit(Metric.ReportUser_ReportsSent, 1);
+        await metricService.Emit(Metric.ReportUser_ReportsSent, 1);
     }
 }

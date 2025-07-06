@@ -14,13 +14,13 @@ public sealed class TestContext
     public ulong ChannelID { get; init; } = 1420070400200;
     public ulong GuildID { get; init; } = 1420070400300;
 
-    public List<Snowflake> UserRoles { get; init; } = new();
+    public List<Snowflake> UserRoles { get; init; } = [];
 
     public Action<Embed> EmbedCallback { get; init; } = _ => { };
 
     public Mock<ITextChannel> TextChannelMock { get; internal set; } = null!;
 
-    public List<IGuildUser> GuildUsers { get; init; } = new();
+    public List<IGuildUser> GuildUsers { get; init; } = [];
 
     public Dictionary<Snowflake, TestChannel> Channels { get; init; } = new();
     public Dictionary<Snowflake, TestRole> Roles { get; init; } = new();
@@ -33,7 +33,7 @@ public sealed class TestContext
     public void AddWarning(Snowflake userId, Warning warning)
     {
         if (!Warnings.ContainsKey(userId))
-            Warnings.Add(userId, new List<Warning> { warning });
+            Warnings.Add(userId, [warning]);
         else
             Warnings[userId].Add(warning);
     }
@@ -41,7 +41,7 @@ public sealed class TestContext
     public void AddCaselog(Snowflake userId, Caselog caselog)
     {
         if (!Caselogs.ContainsKey(userId))
-            Caselogs.Add(userId, new List<Caselog> { caselog });
+            Caselogs.Add(userId, [caselog]);
         else
             Caselogs[userId].Add(caselog);
     }

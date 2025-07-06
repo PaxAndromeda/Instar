@@ -27,7 +27,7 @@ namespace PaxAndromeda.Instar;
 /// </remarks>
 [TypeConverter(typeof(SnowflakeConverter))]
 [JsonConverter(typeof(JSnowflakeConverter))]
-public sealed class Snowflake : IEquatable<Snowflake>
+public sealed record Snowflake
 {
     private static int _increment;
 

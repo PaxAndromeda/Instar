@@ -5,12 +5,7 @@
 /// regardless of the team's snowflake.
 /// </summary>
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = true)]
-public sealed class TeamRefAttribute : Attribute
+public sealed class TeamRefAttribute(string teamInternalId) : Attribute
 {
-    public TeamRefAttribute(string teamInternalId)
-    {
-        InternalID = teamInternalId;
-    }
-
-    public string InternalID { get; }
+    public string InternalID { get; } = teamInternalId;
 }
