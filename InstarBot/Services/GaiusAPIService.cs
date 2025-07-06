@@ -110,13 +110,16 @@ public sealed class GaiusAPIService(IDynamicConfigService config) : IGaiusAPISer
         return ParseCaselogs(result);
     }
 
-    private static IEnumerable<Caselog> ParseCaselogs(string response)
+    internal static IEnumerable<Caselog> ParseCaselogs(string response)
     {
         // Remove any instances of "totalCases"
         while (response.Contains("\"totalcases\":", StringComparison.OrdinalIgnoreCase))
         {
-            var start = response.IndexOf("\"totalcases\":", StringComparison.OrdinalIgnoreCase); 
+            var start = response.IndexOf("\"totalcases\":", StringComparison.OrdinalIgnoreCase);
             var end = response.IndexOfAny([',', '}'], start);
+
+            response = response.Remove(start, end - start + (response[end] == ',' ? 1 : 0));
+        }
 
         if (response.Length <= 2)
             yield break;
@@ -139,8 +142,10 @@ public sealed class GaiusAPIService(IDynamicConfigService config) : IGaiusAPISer
 
     private HttpRequestMessage CreateRequest(string url)
     {
-        var hrm = new HttpRequestMessage();
-        hrm.RequestUri = new Uri(url);
+        var hrm = new HttpRequestMessage
+        {
+            RequestUri = new Uri(url)
+        };
         hrm.Headers.Add("Accept", "application/json");
         hrm.Headers.Add("api-key", _apiKey);
 
