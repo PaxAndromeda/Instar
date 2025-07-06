@@ -3,8 +3,6 @@ using System.Text;
 using Discord;
 using Discord.Interactions;
 using JetBrains.Annotations;
-using Microsoft.Extensions.Configuration;
-using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 using Serilog;
@@ -12,25 +10,17 @@ using Serilog;
 namespace PaxAndromeda.Instar.Commands;
 
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class CheckEligibilityCommand : BaseCommand
+public class CheckEligibilityCommand(
+    IDynamicConfigService dynamicConfig,
+    AutoMemberSystem autoMemberSystem,
+    IMetricService metricService)
+    : BaseCommand
 {
-    private readonly IDynamicConfigService _dynamicConfig;
-    private readonly AutoMemberSystem _autoMemberSystem;
-    private readonly IMetricService _metricService;
-
-    public CheckEligibilityCommand(IDynamicConfigService dynamicConfig, AutoMemberSystem autoMemberSystem,
-        IMetricService metricService)
-    {
-        _dynamicConfig = dynamicConfig;
-        _autoMemberSystem = autoMemberSystem;
-        _metricService = metricService;
-    }
-
     [UsedImplicitly]
     [SlashCommand("checkeligibility", "This command checks your membership eligibility.")]
     public async Task CheckEligibility()
     {
-        var config = await _dynamicConfig.GetConfig();
+        var config = await dynamicConfig.GetConfig();
         
         if (Context.User is null)
         {
@@ -50,7 +40,7 @@ public class CheckEligibilityCommand : BaseCommand
             return;
         }
         
-        var eligibility = await _autoMemberSystem.CheckEligibility(Context.User);
+        var eligibility = await autoMemberSystem.CheckEligibility(Context.User);
 
         Log.Debug("Building response embed...");
         var fields = new List<EmbedFieldBuilder>();
@@ -83,12 +73,12 @@ public class CheckEligibilityCommand : BaseCommand
 
         Log.Debug("Responding...");
         await RespondAsync(embed: builder.Build(), ephemeral: true);
-        await _metricService.Emit(Metric.AMS_EligibilityCheck, 1);
+        await metricService.Emit(Metric.AMS_EligibilityCheck, 1);
     }
 
     private async Task<string> BuildMissingItemsText(MembershipEligibility eligibility, IGuildUser user)
     {
-        var config = await _dynamicConfig.GetConfig();
+        var config = await dynamicConfig.GetConfig();
         
         if (eligibility == MembershipEligibility.Eligible)
             return string.Empty;

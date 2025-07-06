@@ -150,10 +150,17 @@ public sealed class AutoMemberSystem
 
     private async void TimerElapsed(object? sender, ElapsedEventArgs e)
     {
-        // Ensure the timer's interval is exactly 1 hour
-        _timer.Interval = 60 * 60 * 1000;
+        try
+        {
+            // Ensure the timer's interval is exactly 1 hour
+            _timer.Interval = 60 * 60 * 1000;
 
-        await RunAsync();
+            await RunAsync();
+        }
+        catch
+        {
+            // ignore
+        }
     }
     
     public async Task RunAsync()
@@ -163,7 +170,7 @@ public sealed class AutoMemberSystem
             await _metricService.Emit(Metric.AMS_Runs, 1);
             var cfg = await _dynamicConfig.GetConfig();
             
-            // Caution:  This is an extremely long running method!
+            // Caution:  This is an extremely long-running method!
             Log.Information("Beginning auto member routine");
 
             if (cfg.AutoMemberConfig.EnableGaiusCheck)
@@ -195,7 +202,7 @@ public sealed class AutoMemberSystem
                 
             foreach (var user in newMembers)
             {
-                // User has all of the qualifications, let's update their role
+                // User has all the qualifications, let's update their role
                 try
                 {
                     await GrantMembership(cfg, user);
@@ -226,7 +233,7 @@ public sealed class AutoMemberSystem
         if (grantedMembership is null)
             return false;
         
-        // Cache for 6 hour sliding window.  If accessed, time is reset.
+        // Cache for 6-hour sliding window.  If accessed, time is reset.
         _ddbCache.Add(snowflake.ID.ToString(), grantedMembership.Value, new CacheItemPolicy
         {
             SlidingExpiration = TimeSpan.FromHours(6)
@@ -303,9 +310,7 @@ public sealed class AutoMemberSystem
 
         foreach (var cacheEntry in _messageCache)
         {
-            if (!map.ContainsKey(cacheEntry.Value.UserID))
-                map.Add(cacheEntry.Value.UserID, 1);
-            else
+            if (!map.TryAdd(cacheEntry.Value.UserID, 1))
                 map[cacheEntry.Value.UserID]++;
         }
 

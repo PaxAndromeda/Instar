@@ -11,17 +11,8 @@ namespace PaxAndromeda.Instar.Commands;
 
 // Required to be unsealed for mocking
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class SetBirthdayCommand : BaseCommand
+public class SetBirthdayCommand(IInstarDDBService ddbService, IMetricService metricService) : BaseCommand
 {
-    private readonly IInstarDDBService _ddbService;
-    private readonly IMetricService _metricService;
-
-    public SetBirthdayCommand(IInstarDDBService ddbService, IMetricService metricService)
-    {
-        _ddbService = ddbService;
-        _metricService = metricService;
-    }
-
     [UsedImplicitly]
     [RequireOwner]
     [DefaultMemberPermissions(GuildPermission.Administrator)]
@@ -69,7 +60,7 @@ public class SetBirthdayCommand : BaseCommand
                 dtUtc);
         // TODO:  Notify staff?
 
-        var ok = await _ddbService.UpdateUserBirthday(new Snowflake(Context.User!.Id), dtUtc);
+        var ok = await ddbService.UpdateUserBirthday(new Snowflake(Context.User!.Id), dtUtc);
 
         if (ok)
         {
@@ -78,7 +69,7 @@ public class SetBirthdayCommand : BaseCommand
                 dtLocal, dtUtc);
 
             await RespondAsync($"Your birthday was set to {dtLocal:D}.", ephemeral: true);
-            await _metricService.Emit(Metric.BS_BirthdaysSet, 1);
+            await metricService.Emit(Metric.BS_BirthdaysSet, 1);
         }
         else
         {
@@ -96,34 +87,34 @@ public class SetBirthdayCommand : BaseCommand
     public async Task HandleTimezoneAutocomplete()
     {
         Log.Debug("AUTOCOMPLETE");
-        IEnumerable<AutocompleteResult> results = new[]
-        {
-            new AutocompleteResult("GMT-12 International Date Line West", -12),
-            new AutocompleteResult("GMT-11 Midway Island, Samoa", -11),
-            new AutocompleteResult("GMT-10 Hawaii", -10),
-            new AutocompleteResult("GMT-9 Alaska", -9),
-            new AutocompleteResult("GMT-8 Pacific Time (US and Canada); Tijuana", -8),
-            new AutocompleteResult("GMT-7 Mountain Time (US and Canada)", -7),
-            new AutocompleteResult("GMT-6 Central Time (US and Canada)", -6),
-            new AutocompleteResult("GMT-5 Eastern Time (US and Canada)", -5),
-            new AutocompleteResult("GMT-4 Atlantic Time (Canada)", -4),
-            new AutocompleteResult("GMT-3 Brasilia, Buenos Aires, Georgetown", -3),
-            new AutocompleteResult("GMT-2 Mid-Atlantic", -2),
-            new AutocompleteResult("GMT-1 Azores, Cape Verde Islands", -1),
-            new AutocompleteResult("GMT+0 Greenwich Mean Time: Dublin, Edinburgh, Lisbon, London", 0),
-            new AutocompleteResult("GMT+1 Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna", 1),
-            new AutocompleteResult("GMT+2 Helsinki, Kiev, Riga, Sofia, Tallinn, Vilnius", 2),
-            new AutocompleteResult("GMT+3 Moscow, St. Petersburg, Volgograd", 3),
-            new AutocompleteResult("GMT+4 Abu Dhabi, Muscat", 4),
-            new AutocompleteResult("GMT+5 Islamabad, Karachi, Tashkent", 5),
-            new AutocompleteResult("GMT+6 Astana, Dhaka", 6),
-            new AutocompleteResult("GMT+7 Bangkok, Hanoi, Jakarta", 7),
-            new AutocompleteResult("GMT+8 Beijing, Chongqing, Hong Kong SAR, Urumqi", 8),
-            new AutocompleteResult("GMT+9 Seoul, Osaka, Sapporo, Tokyo", 9),
-            new AutocompleteResult("GMT+10 Canberra, Melbourne, Sydney", 10),
-            new AutocompleteResult("GMT+11 Magadan, Solomon Islands, New Caledonia", 11),
-            new AutocompleteResult("GMT+12 Auckland, Wellington", 12)
-        };
+        IEnumerable<AutocompleteResult> results =
+        [
+            new("GMT-12 International Date Line West", -12),
+            new("GMT-11 Midway Island, Samoa", -11),
+            new("GMT-10 Hawaii", -10),
+            new("GMT-9 Alaska", -9),
+            new("GMT-8 Pacific Time (US and Canada); Tijuana", -8),
+            new("GMT-7 Mountain Time (US and Canada)", -7),
+            new("GMT-6 Central Time (US and Canada)", -6),
+            new("GMT-5 Eastern Time (US and Canada)", -5),
+            new("GMT-4 Atlantic Time (Canada)", -4),
+            new("GMT-3 Brasilia, Buenos Aires, Georgetown", -3),
+            new("GMT-2 Mid-Atlantic", -2),
+            new("GMT-1 Azores, Cape Verde Islands", -1),
+            new("GMT+0 Greenwich Mean Time: Dublin, Edinburgh, Lisbon, London", 0),
+            new("GMT+1 Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna", 1),
+            new("GMT+2 Helsinki, Kiev, Riga, Sofia, Tallinn, Vilnius", 2),
+            new("GMT+3 Moscow, St. Petersburg, Volgograd", 3),
+            new("GMT+4 Abu Dhabi, Muscat", 4),
+            new("GMT+5 Islamabad, Karachi, Tashkent", 5),
+            new("GMT+6 Astana, Dhaka", 6),
+            new("GMT+7 Bangkok, Hanoi, Jakarta", 7),
+            new("GMT+8 Beijing, Chongqing, Hong Kong SAR, Urumqi", 8),
+            new("GMT+9 Seoul, Osaka, Sapporo, Tokyo", 9),
+            new("GMT+10 Canberra, Melbourne, Sydney", 10),
+            new("GMT+11 Magadan, Solomon Islands, New Caledonia", 11),
+            new("GMT+12 Auckland, Wellington", 12)
+        ];
 
         await (Context.Interaction as SocketAutocompleteInteraction)?.RespondAsync(results)!;
     }

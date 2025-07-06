@@ -5,13 +5,8 @@ namespace PaxAndromeda.Instar;
 
 internal sealed class AsyncEvent<T>
 {
-    private readonly object _subLock = new();
-    private ImmutableArray<Func<T, Task>> _subscriptions;
-
-    public AsyncEvent()
-    {
-        _subscriptions = ImmutableArray.Create<Func<T, Task>>();
-    }
+    private readonly Lock _subLock = new();
+    private ImmutableArray<Func<T, Task>> _subscriptions = [];
 
     public async Task Invoke(T parameter)
     {

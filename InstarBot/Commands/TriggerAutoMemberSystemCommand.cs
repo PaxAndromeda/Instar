@@ -5,15 +5,8 @@ using PaxAndromeda.Instar.Services;
 
 namespace PaxAndromeda.Instar.Commands;
 
-public sealed class TriggerAutoMemberSystemCommand : BaseCommand
+public sealed class TriggerAutoMemberSystemCommand(AutoMemberSystem ams) : BaseCommand
 {
-    private readonly AutoMemberSystem _ams;
-
-    public TriggerAutoMemberSystemCommand(AutoMemberSystem ams)
-    {
-        _ams = ams;
-    }
-    
     [UsedImplicitly]
     [RequireOwner]
     [DefaultMemberPermissions(GuildPermission.Administrator)]
@@ -23,6 +16,6 @@ public sealed class TriggerAutoMemberSystemCommand : BaseCommand
         await RespondAsync("Auto Member System is running!", ephemeral: true);
         
         // Run it asynchronously
-        await _ams.RunAsync();
+        await ams.RunAsync();
     }
 }

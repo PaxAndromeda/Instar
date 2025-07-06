@@ -78,7 +78,6 @@ Feature: Auto Member System
 			Then the user should remain unchanged
 		
 	Rule: Users should have all minimum requirements for membership
-		
 		Scenario: A user that did not post an introduction should not be granted membership
 			Given a user that has:
 			* Joined 36 hours ago

@@ -85,14 +85,14 @@ public sealed class DiscordService : IDiscordService
     {
         Log.Information("Message command: {CommandName}", arg.CommandName);
 
-        if (!_contextCommands.ContainsKey(arg.CommandName))
+        if (!_contextCommands.TryGetValue(arg.CommandName, out var command))
         {
             Log.Warning("Received message command interaction for unknown command by name {CommandName}",
                 arg.CommandName);
             return;
         }
 
-        await _contextCommands[arg.CommandName].HandleCommand(new MessageCommandInteractionWrapper(arg));
+        await command.HandleCommand(new MessageCommandInteractionWrapper(arg));
     }
 
     private async Task HandleInteraction(SocketInteraction arg)
@@ -187,14 +187,14 @@ public sealed class DiscordService : IDiscordService
         try
         {
             var guild = _socketClient.GetGuild(_guild);
-            await _socketClient.DownloadUsersAsync(new[] { guild });
+            await _socketClient.DownloadUsersAsync([guild]);
 
             return guild.Users;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to download users for guild {GuildID}", _guild);
-            return Array.Empty<IGuildUser>();
+            return [];
         }
     }
     

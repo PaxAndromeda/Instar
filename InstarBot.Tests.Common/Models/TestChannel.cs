@@ -9,16 +9,10 @@ using MessageProperties = Discord.MessageProperties;
 namespace InstarBot.Tests.Models;
 
 [SuppressMessage("ReSharper", "ReplaceAutoPropertyWithComputedProperty")]
-public sealed class TestChannel : ITextChannel
+public sealed class TestChannel(Snowflake id) : ITextChannel
 {
-    public TestChannel(Snowflake id)
-    {
-        Id = id;
-        CreatedAt = id.Time;
-    }
-
-    public ulong Id { get; }
-    public DateTimeOffset CreatedAt { get; }
+    public ulong Id { get; } = id;
+    public DateTimeOffset CreatedAt { get; } = id.Time;
 
     public Task ModifyAsync(Action<GuildChannelProperties> func, RequestOptions options = null)
     {
@@ -66,10 +60,10 @@ public sealed class TestChannel : ITextChannel
         throw new NotImplementedException();
     }
 
-    public int Position { get; } = default!;
+    public int Position { get; } = 0;
     public ChannelFlags Flags { get; } = default!;
     public IGuild Guild { get; } = null!;
-    public ulong GuildId { get; } = default!;
+    public ulong GuildId { get; } = 0;
     public IReadOnlyCollection<Overwrite> PermissionOverwrites { get; } = null!;
 
     IAsyncEnumerable<IReadOnlyCollection<IUser>> IChannel.GetUsersAsync(CacheMode mode, RequestOptions options)
@@ -83,50 +77,6 @@ public sealed class TestChannel : ITextChannel
     }
 
     public string Name { get; } = null!;
-
-    public Task<IUserMessage> SendMessageAsync(string text = null, bool isTTS = false, Embed embed = null,
-        RequestOptions options = null,
-        AllowedMentions allowedMentions = null, MessageReference messageReference = null,
-        MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null,
-        MessageFlags flags = MessageFlags.None)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<IUserMessage> SendFileAsync(string filePath, string text = null, bool isTTS = false, Embed embed = null,
-        RequestOptions options = null, bool isSpoiler = false, AllowedMentions allowedMentions = null,
-        MessageReference messageReference = null, MessageComponent components = null, ISticker[] stickers = null,
-        Embed[] embeds = null, MessageFlags flags = MessageFlags.None)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<IUserMessage> SendFileAsync(Stream stream, string filename, string text = null, bool isTTS = false,
-        Embed embed = null,
-        RequestOptions options = null, bool isSpoiler = false, AllowedMentions allowedMentions = null,
-        MessageReference messageReference = null, MessageComponent components = null, ISticker[] stickers = null,
-        Embed[] embeds = null, MessageFlags flags = MessageFlags.None)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<IUserMessage> SendFileAsync(FileAttachment attachment, string text = null, bool isTTS = false,
-        Embed embed = null,
-        RequestOptions options = null, AllowedMentions allowedMentions = null, MessageReference messageReference = null,
-        MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null,
-        MessageFlags flags = MessageFlags.None)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<IUserMessage> SendFilesAsync(IEnumerable<FileAttachment> attachments, string text = null,
-        bool isTTS = false, Embed embed = null,
-        RequestOptions options = null, AllowedMentions allowedMentions = null, MessageReference messageReference = null,
-        MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null,
-        MessageFlags flags = MessageFlags.None)
-    {
-        throw new NotImplementedException();
-    }
 
     public Task<IMessage> GetMessageAsync(ulong id, CacheMode mode = CacheMode.AllowDownload,
         RequestOptions options = null)
@@ -236,7 +186,7 @@ public sealed class TestChannel : ITextChannel
         throw new NotImplementedException();
     }
 
-    public ulong? CategoryId { get; } = default!;
+    public ulong? CategoryId { get; } = null;
 
     public Task<IWebhook> CreateWebhookAsync(string name, Stream avatar = null, RequestOptions options = null)
     {
@@ -280,15 +230,44 @@ public sealed class TestChannel : ITextChannel
         throw new NotImplementedException();
     }
 
-    public bool IsNsfw { get; } = default!;
+    public bool IsNsfw { get; } = false;
     public string Topic { get; } = null!;
-    public int SlowModeInterval { get; } = default!;
+    public int SlowModeInterval { get; } = 0;
     public ThreadArchiveDuration DefaultArchiveDuration { get; } = default!;
 
-    private readonly List<TestMessage> _messages = new();
+    public int DefaultSlowModeInterval => throw new NotImplementedException();
+
+    public ChannelType ChannelType => throw new NotImplementedException();
+
+    private readonly List<TestMessage> _messages = [];
 
     public void AddMessage(IGuildUser user, string message)
     {
         _messages.Add(new TestMessage(user, message));
+    }
+
+    public Task<IUserMessage> SendMessageAsync(string text = null, bool isTTS = false, Embed embed = null, RequestOptions options = null, AllowedMentions allowedMentions = null, MessageReference messageReference = null, MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null, MessageFlags flags = MessageFlags.None, PollProperties poll = null)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<IUserMessage> SendFileAsync(string filePath, string text = null, bool isTTS = false, Embed embed = null, RequestOptions options = null, bool isSpoiler = false, AllowedMentions allowedMentions = null, MessageReference messageReference = null, MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null, MessageFlags flags = MessageFlags.None, PollProperties poll = null)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<IUserMessage> SendFileAsync(Stream stream, string filename, string text = null, bool isTTS = false, Embed embed = null, RequestOptions options = null, bool isSpoiler = false, AllowedMentions allowedMentions = null, MessageReference messageReference = null, MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null, MessageFlags flags = MessageFlags.None, PollProperties poll = null)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<IUserMessage> SendFileAsync(FileAttachment attachment, string text = null, bool isTTS = false, Embed embed = null, RequestOptions options = null, AllowedMentions allowedMentions = null, MessageReference messageReference = null, MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null, MessageFlags flags = MessageFlags.None, PollProperties poll = null)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<IUserMessage> SendFilesAsync(IEnumerable<FileAttachment> attachments, string text = null, bool isTTS = false, Embed embed = null, RequestOptions options = null, AllowedMentions allowedMentions = null, MessageReference messageReference = null, MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null, MessageFlags flags = MessageFlags.None, PollProperties poll = null)
+    {
+        throw new NotImplementedException();
     }
 }

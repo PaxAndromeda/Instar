@@ -42,13 +42,15 @@ public sealed class TestRole : IRole
 
     public IGuild Guild { get; set; } = null!;
     public Color Color { get; set; } = default!;
-    public bool IsHoisted { get; set; } = default!;
-    public bool IsManaged { get; set; } = default!;
-    public bool IsMentionable { get; set; } = default!;
+    public bool IsHoisted { get; set; } = false;
+    public bool IsManaged { get; set; } = false;
+    public bool IsMentionable { get; set; } = false;
     public string Name { get; set; } = null!;
     public string Icon { get; set; } = null!;
     public Emoji Emoji { get; set; } = null!;
     public GuildPermissions Permissions { get; set; } = default!;
-    public int Position { get; set; } = default!;
+    public int Position { get; set; } = 0;
     public RoleTags Tags { get; set; } = null!;
+
+    public RoleFlags Flags { get; set; } = default!;
 }

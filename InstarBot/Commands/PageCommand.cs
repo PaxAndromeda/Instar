@@ -14,17 +14,8 @@ namespace PaxAndromeda.Instar.Commands;
 // Required to be unsealed for mocking
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
 [SuppressMessage("ReSharper", "ClassWithVirtualMembersNeverInherited.Global")] // Required for mocking
-public class PageCommand : BaseCommand
+public class PageCommand(TeamService teamService, IMetricService metricService) : BaseCommand
 {
-    private readonly TeamService _teamService;
-    private readonly IMetricService _metricService;
-
-    public PageCommand(TeamService teamService, IMetricService metricService)
-    {
-        _teamService = teamService;
-        _metricService = metricService;
-    }
-
     [UsedImplicitly]
     [SlashCommand("page", "This command initiates a directed page.")]
     [RequireStaffMember]
@@ -51,7 +42,7 @@ public class PageCommand : BaseCommand
         {
             Log.Verbose("User {User} is attempting to page {Team}: {Reason}", Context.User.Id, team, reason);
 
-            var userTeam = await _teamService.GetUserPrimaryStaffTeam(Context.User);
+            var userTeam = await teamService.GetUserPrimaryStaffTeam(Context.User);
             if (!CheckPermissions(Context.User, userTeam, team, teamLead, out var response))
             {
                 await RespondAsync(response, ephemeral: true);
@@ -62,9 +53,9 @@ public class PageCommand : BaseCommand
             if (team == PageTarget.Test)
                 mention = "This is a __**TEST**__ page.";
             else if (teamLead)
-                mention = await _teamService.GetTeamLeadMention(team);
+                mention = await teamService.GetTeamLeadMention(team);
             else
-                mention = await _teamService.GetTeamMention(team);
+                mention = await teamService.GetTeamMention(team);
 
             Log.Debug("Emitting page to {ChannelName}", Context.Channel?.Name);
             await RespondAsync(
@@ -72,7 +63,7 @@ public class PageCommand : BaseCommand
                 embed: BuildEmbed(reason, message, user, channel, userTeam!, Context.User),
                 allowedMentions: AllowedMentions.All);
 
-            await _metricService.Emit(Metric.Paging_SentPages, 1);
+            await metricService.Emit(Metric.Paging_SentPages, 1);
         }
         catch (Exception ex)
         {

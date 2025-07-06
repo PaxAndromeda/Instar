@@ -47,10 +47,7 @@ public sealed class CloudwatchMetricService : IMetricService
             var response = await _client.PutMetricDataAsync(new PutMetricDataRequest
             {
                 Namespace = _metricNamespace,
-                MetricData = new List<MetricDatum>
-                {
-                    datum
-                }
+                MetricData = [datum]
             });
 
             return response.HttpStatusCode == HttpStatusCode.OK;

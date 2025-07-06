@@ -5,7 +5,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Preconditions;
 using Xunit;
 
@@ -25,10 +24,7 @@ public sealed class RequireStaffMemberAttributeTests
 
         var context = TestUtilities.SetupContext(new TestContext
         {
-            UserRoles = new List<Snowflake>
-            {
-                new(793607635608928257)
-            }
+            UserRoles = [new(793607635608928257)]
         });
 
         // Act
@@ -62,10 +58,7 @@ public sealed class RequireStaffMemberAttributeTests
 
         var context = TestUtilities.SetupContext(new TestContext
         {
-            UserRoles = new List<Snowflake>
-            {
-                new(793607635608928257)
-            }
+            UserRoles = [new(793607635608928257)]
         });
 
         // Act
@@ -83,10 +76,7 @@ public sealed class RequireStaffMemberAttributeTests
 
         var context = TestUtilities.SetupContext(new TestContext
         {
-            UserRoles = new List<Snowflake>
-            {
-                new()
-            }
+            UserRoles = [new()]
         });
 
         // Act
