@@ -53,7 +53,7 @@ public sealed class MockDiscordService : IDiscordService
 
     public Task<IChannel> GetChannel(Snowflake channelId)
     {
-        return Task.FromResult(_guild.GetTextChannel(channelId) as IChannel);
+        return Task.FromResult<IChannel>(_guild.GetTextChannel(channelId));
     }
 
     public async IAsyncEnumerable<IMessage> GetMessages(IInstarGuild guild, DateTime afterTime)

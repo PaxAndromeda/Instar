@@ -110,7 +110,7 @@ public sealed class GaiusAPIService(IDynamicConfigService config) : IGaiusAPISer
         return ParseCaselogs(result);
     }
 
-    internal static IEnumerable<Caselog> ParseCaselogs(string response)
+    private static IEnumerable<Caselog> ParseCaselogs(string response)
     {
         // Remove any instances of "totalCases"
         while (response.Contains("\"totalcases\":", StringComparison.OrdinalIgnoreCase))

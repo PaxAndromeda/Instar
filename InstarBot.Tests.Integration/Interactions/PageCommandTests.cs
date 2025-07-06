@@ -8,7 +8,7 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public class PageCommandTests
+public static class PageCommandTests
 {
     private static async Task<Mock<PageCommand>> SetupCommandMock(PageCommandTestContext context)
     {

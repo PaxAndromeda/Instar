@@ -8,9 +8,9 @@ namespace InstarBot.Tests;
 
 public sealed class TestContext
 {
-    public ulong UserID { get; init; } = 1420070400100;
-    public ulong ChannelID { get; init; } = 1420070400200;
-    public ulong GuildID { get; init; } = 1420070400300;
+    public ulong UserID { get; init; }= 1420070400100;
+    public const ulong ChannelID = 1420070400200;
+    public const ulong GuildID = 1420070400300;
 
     public List<Snowflake> UserRoles { get; init; } = [];
 
@@ -18,13 +18,13 @@ public sealed class TestContext
 
     public Mock<ITextChannel> TextChannelMock { get; internal set; } = null!;
 
-    public List<IGuildUser> GuildUsers { get; init; } = [];
+    public List<IGuildUser> GuildUsers { get; } = [];
 
-    public Dictionary<Snowflake, TestChannel> Channels { get; init; } = [];
-    public Dictionary<Snowflake, TestRole> Roles { get; init; } = [];
+    public Dictionary<Snowflake, TestChannel> Channels { get; } = [];
+    public Dictionary<Snowflake, TestRole> Roles { get; } = [];
 
-    public Dictionary<Snowflake, List<Warning>> Warnings { get; init; } = [];
-    public Dictionary<Snowflake, List<Caselog>> Caselogs { get; init; } = [];
+    public Dictionary<Snowflake, List<Warning>> Warnings { get; } = [];
+    public Dictionary<Snowflake, List<Caselog>> Caselogs { get; } = [];
 
     public bool InhibitGaius { get; set; }
 

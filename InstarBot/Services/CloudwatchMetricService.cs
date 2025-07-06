@@ -29,7 +29,7 @@ public sealed class CloudwatchMetricService : IMetricService
 
             var datum = new MetricDatum
             {
-                MetricName = nameAttr is not null ? nameAttr.Name : Enum.GetName(typeof(Metric), metric),
+                MetricName = nameAttr is not null ? nameAttr.Name : Enum.GetName(metric),
                 Value = value
             };
 

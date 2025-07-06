@@ -1,5 +1,4 @@
-﻿using Discord;
-using FluentAssertions;
+﻿using FluentAssertions;
 using InstarBot.Tests.Models;
 using InstarBot.Tests.Services;
 using PaxAndromeda.Instar;
@@ -10,7 +9,7 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public class AutoMemberSystemTests
+public static class AutoMemberSystemTests
 {
     private static readonly Snowflake NewMember = new(796052052433698817);
     private static readonly Snowflake Member = new(793611808372031499);
@@ -361,7 +360,7 @@ public class AutoMemberSystemTests
         public static AutoMemberSystemContextBuilder Builder() => new();
 
         public IDiscordService? DiscordService { get; set; }
-        public IGuildUser User { get; set; } = null!;
+        public TestGuildUser? User { get; set; }
 
         public void AssertMember()
         {
@@ -379,9 +378,8 @@ public class AutoMemberSystemTests
 
         public void AssertUserUnchanged()
         {
-            var testUser = User as TestGuildUser;
-            testUser.Should().NotBeNull();
-            testUser.Changed.Should().BeFalse();
+            User.Should().NotBeNull();
+            User.Changed.Should().BeFalse();
         }
     }
 
@@ -468,16 +466,16 @@ public class AutoMemberSystemTests
                     Type = CaselogType.Mute,
                     Reason = "TEST PUNISHMENT",
                     ModID = Snowflake.Generate(),
-                    UserID = userId,
+                    UserID = userId
                 });
             }
             if (_gaiusWarned)
             {
-                testContext.AddWarning(userId, new Warning()
+                testContext.AddWarning(userId, new Warning
                 {
                     Reason = "TEST PUNISHMENT",
                     ModID = Snowflake.Generate(),
-                    UserID = userId,
+                    UserID = userId
                 });
             }
 

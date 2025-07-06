@@ -279,7 +279,7 @@ public sealed class AutoMemberSystem
         if (!_introductionPosters.ContainsKey(user.Id))
             eligibility |=  MembershipEligibility.MissingIntroduction;
 
-        if (_recentMessages.TryGetValue(user.Id, out int messages) && messages < cfg.AutoMemberConfig.MinimumMessages)
+        if (_recentMessages.TryGetValue(user.Id, out var messages) && messages < cfg.AutoMemberConfig.MinimumMessages)
             eligibility |=  MembershipEligibility.NotEnoughMessages;
 
         if (_punishedUsers.ContainsKey(user.Id))
@@ -306,7 +306,7 @@ public sealed class AutoMemberSystem
 
     private Dictionary<ulong, int> GetMessagesSent()
     {
-        var map = this._messageCache
+        var map = _messageCache
             .Cast<KeyValuePair<string, MessageProperties>>() // Cast to access LINQ extensions
             .Select(entry => entry.Value)
             .GroupBy(properties => properties.UserID)
