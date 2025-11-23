@@ -1,65 +1,71 @@
-using InstarBot.Tests.Models;
+using Amazon.DynamoDBv2.DataModel;
+using Discord;
+using Moq;
 using PaxAndromeda.Instar;
+using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Services;
 
 namespace InstarBot.Tests.Services;
 
+/// <summary>
+/// A mock implementation of the <c>IInstarDDBService</c> interface for unit testing purposes.
+/// This class provides an in-memory storage mechanism to simulate DynamoDB operations.
+/// </summary>
 public sealed class MockInstarDDBService : IInstarDDBService
 {
-    private readonly Dictionary<Snowflake, UserDatabaseInformation> _localData;
+    private readonly Dictionary<Snowflake, InstarUserData> _localData;
 
     public MockInstarDDBService()
     {
-        _localData = new Dictionary<Snowflake, UserDatabaseInformation>();
+        _localData = new Dictionary<Snowflake, InstarUserData>();
     }
 
-    public MockInstarDDBService(IEnumerable<UserDatabaseInformation> preload)
+    public MockInstarDDBService(IEnumerable<InstarUserData> preload)
     {
-        _localData = preload.ToDictionary(n => n.Snowflake, n => n);
+        _localData = preload.ToDictionary(n => n.UserID!, n => n);
     }
 
-    public Task<bool> UpdateUserBirthday(Snowflake snowflake, DateTime birthday)
+    public void Register(InstarUserData data)
     {
-        _localData.TryAdd(snowflake, new UserDatabaseInformation(snowflake));
-        _localData[snowflake].Birthday = birthday;
-
-        return Task.FromResult(true);
+        _localData.TryAdd(data.UserID!, data);
     }
 
-    public Task<bool> UpdateUserJoinDate(Snowflake snowflake, DateTime joinDate)
+    public Task<InstarDatabaseEntry<InstarUserData>?> GetUserAsync(Snowflake snowflake)
     {
-        _localData.TryAdd(snowflake, new UserDatabaseInformation(snowflake));
-        _localData[snowflake].JoinDate = joinDate;
+        if (!_localData.TryGetValue(snowflake, out var data))
+            throw new InvalidOperationException("User not found.");
 
-        return Task.FromResult(true);
+        var ddbContextMock = new Mock<IDynamoDBContext>();
+
+        return Task.FromResult(new InstarDatabaseEntry<InstarUserData>(ddbContextMock.Object, data))!;
     }
 
-    public Task<bool> UpdateUserMembership(Snowflake snowflake, bool membershipGranted)
+    public Task<InstarDatabaseEntry<InstarUserData>> GetOrCreateUserAsync(IGuildUser user)
     {
-        _localData.TryAdd(snowflake, new UserDatabaseInformation(snowflake));
-        _localData[snowflake].GrantedMembership = membershipGranted;
+        if (!_localData.TryGetValue(user.Id, out var data))
+            data = InstarUserData.CreateFrom(user);
 
-        return Task.FromResult(true);
+        var ddbContextMock = new Mock<IDynamoDBContext>();
+
+        return Task.FromResult(new InstarDatabaseEntry<InstarUserData>(ddbContextMock.Object, data));
     }
 
-    public Task<DateTimeOffset?> GetUserBirthday(Snowflake snowflake)
+    public Task<List<InstarDatabaseEntry<InstarUserData>>> GetBatchUsersAsync(IEnumerable<Snowflake> snowflakes)
     {
-        return !_localData.TryGetValue(snowflake, out var value)
-            ? Task.FromResult<DateTimeOffset?>(null)
-            : Task.FromResult<DateTimeOffset?>(value.Birthday);
+        return Task.FromResult(GetLocalUsers(snowflakes)
+            .Select(n => new InstarDatabaseEntry<InstarUserData>(new Mock<IDynamoDBContext>().Object, n)).ToList());
     }
 
-    public Task<DateTimeOffset?> GetUserJoinDate(Snowflake snowflake)
+    private IEnumerable<InstarUserData> GetLocalUsers(IEnumerable<Snowflake> snowflakes)
     {
-        return !_localData.TryGetValue(snowflake, out var value)
-            ? Task.FromResult<DateTimeOffset?>(null)
-            : Task.FromResult<DateTimeOffset?>(value.JoinDate);
+        foreach (var snowflake in snowflakes)
+            if (_localData.TryGetValue(snowflake, out var data))
+                yield return data;
     }
 
-    public Task<bool?> GetUserMembership(Snowflake snowflake)
+    public Task CreateUserAsync(InstarUserData data)
     {
-        return !_localData.TryGetValue(snowflake, out var value)
-            ? Task.FromResult<bool?>(null)
-            : Task.FromResult<bool?>(value.GrantedMembership);
+        _localData.TryAdd(data.UserID!, data);
+        return Task.CompletedTask;
     }
 }

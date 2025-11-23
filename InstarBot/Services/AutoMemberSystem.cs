@@ -5,13 +5,15 @@ using Discord;
 using Discord.WebSocket;
 using PaxAndromeda.Instar.Caching;
 using PaxAndromeda.Instar.ConfigModels;
+using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Metrics;
+using PaxAndromeda.Instar.Modals;
 using Serilog;
 using Timer = System.Timers.Timer;
 
 namespace PaxAndromeda.Instar.Services;
 
-public sealed class AutoMemberSystem
+public sealed class AutoMemberSystem : IAutoMemberSystem
 {
     private readonly MemoryCache _ddbCache = new("AutoMemberSystem_DDBCache");
     private readonly MemoryCache<MessageProperties> _messageCache = new("AutoMemberSystem_MessageCache");
@@ -42,6 +44,7 @@ public sealed class AutoMemberSystem
         _metricService = metricService;
 
         discord.UserJoined += HandleUserJoined;
+		discord.UserUpdated += HandleUserUpdated;
         discord.MessageReceived += HandleMessageReceived;
         discord.MessageDeleted += HandleMessageDeleted;
 
@@ -119,20 +122,79 @@ public sealed class AutoMemberSystem
     {
         var cfg = await _dynamicConfig.GetConfig();
         
-        if (await WasUserGrantedMembershipBefore(user.Id))
+        var dbUser = await _ddbService.GetUserAsync(user.Id);
+        if (dbUser is null)
         {
-            Log.Information("User {UserID} has been granted membership before.  Granting membership again", user.Id);
-            await GrantMembership(cfg, user);
+            // Let's create a new user
+            await _ddbService.CreateUserAsync(InstarUserData.CreateFrom(user));
         }
         else
         {
-            await user.AddRoleAsync(cfg.NewMemberRoleID);
+            switch (dbUser.Data.Position)
+            {
+                case InstarUserPosition.NewMember:
+                case InstarUserPosition.Unknown:
+                    await user.AddRoleAsync(cfg.NewMemberRoleID);
+                    dbUser.Data.Position = InstarUserPosition.NewMember;
+                    await dbUser.UpdateAsync();
+                    break;
+                
+                default:
+                    // Yes, they were a member
+                    Log.Information("User {UserID} has been granted membership before.  Granting membership again", user.Id);
+                    await GrantMembership(cfg, user, dbUser);
+                    break;
+            }
         }
         
         await _metricService.Emit(Metric.Discord_UsersJoined, 1);
     }
+	
+	private async Task HandleUserUpdated(UserUpdatedEventArgs arg)
+	{
+		if (!arg.HasUpdated)
+			return;
 
-    private void StartTimer()
+		var user = await _ddbService.GetUserAsync(arg.ID);
+		if (user is null)
+		{
+			// new user for the database, create from the latest data and return
+			try
+			{
+				await _ddbService.CreateUserAsync(InstarUserData.CreateFrom(arg.After));
+				Log.Information("Created new user {Username} (user ID {UserID})", arg.After.Username, arg.ID);
+			}
+			catch (Exception ex)
+			{
+				Log.Error(ex, "Failed to create user with ID {UserID}, username {Username}", arg.ID, arg.After.Username);
+			}
+
+			return;
+		}
+
+		// Update the record
+		bool changed = false;
+
+		if (arg.Before.Username != arg.After.Username)
+		{
+			user.Data.Username = arg.After.Username;
+			changed = true;
+		}
+
+		if (arg.Before.Nickname != arg.After.Nickname)
+		{
+			user.Data.Nicknames?.Add(new InstarUserDataHistoricalEntry<string>(DateTime.UtcNow, arg.After.Nickname));
+			changed = true;
+		}
+
+		if (changed)
+		{
+			Log.Information("Updated metadata for user {Username} (user ID {UserID})", arg.After.Username, arg.ID);
+			await user.UpdateAsync();
+		}
+	}
+
+	private void StartTimer()
     {
         // Since we can start the bot in the middle of an hour,
         // first we must determine the time until the next top
@@ -170,7 +232,7 @@ public sealed class AutoMemberSystem
             await _metricService.Emit(Metric.AMS_Runs, 1);
             var cfg = await _dynamicConfig.GetConfig();
             
-            // Caution:  This is an extremely long-running method!
+            // Caution: This is an extremely long-running method!
             Log.Information("Beginning auto member routine");
 
             if (cfg.AutoMemberConfig.EnableGaiusCheck)
@@ -195,26 +257,44 @@ public sealed class AutoMemberSystem
 
             var membershipGrants = 0;
 
-            newMembers = await newMembers.ToAsyncEnumerable()
-                .WhereAwait(async user => await CheckEligibility(user) == MembershipEligibility.Eligible).ToListAsync();
+			var eligibleMembers = newMembers.Where(user => CheckEligibility(cfg, user) == MembershipEligibility.Eligible)
+				.ToDictionary(n => new Snowflake(n.Id), n => n);
             
-            Log.Verbose("There are {NumNewMembers} users eligible for membership", newMembers.Count);
-                
-            foreach (var user in newMembers)
-            {
-                // User has all the qualifications, let's update their role
-                try
-                {
-                    await GrantMembership(cfg, user);
-                    membershipGrants++;
-                    
-                    Log.Information("Granted {UserId} membership", user.Id);
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Failed to grant user {UserId} membership", user.Id);
-                }
-            }
+            Log.Verbose("There are {NumNewMembers} users eligible for membership", eligibleMembers.Count);
+
+            // Batch get users to save bandwidth
+            var userData = (
+				await _ddbService.GetBatchUsersAsync(
+					eligibleMembers.Select(n => n.Key))
+				)
+                .Select(x => (x.Data.UserID!, x))
+                .ToDictionary();
+
+			// Determine which users are not present in DDB and need to be created
+			var usersToCreate = eligibleMembers.Where(n => !userData.ContainsKey(n.Key)).Select(n => n.Value);
+
+			// Step 1: Create missing users in DDB
+			await foreach (var (id, user) in CreateMissingUsers(usersToCreate))
+				userData.Add(id, user);
+
+			// Step 2: Grant membership to eligible users
+			foreach (var (id, dbUser) in userData)
+			{
+				try
+				{
+					// User has all the qualifications, let's update their role
+					if (!eligibleMembers.TryGetValue(id, out var user))
+						throw new BadStateException("Unexpected state: expected ID is missing from eligibleMembers");
+
+					await GrantMembership(cfg, user, dbUser);
+					membershipGrants++;
+
+					Log.Information("Granted {UserId} membership", user.Id);
+				} catch (Exception ex)
+				{
+					Log.Warning(ex, "Failed to grant user {UserId} membership", id);
+				}
+			}
             
             await _metricService.Emit(Metric.AMS_UsersGrantedMembership, membershipGrants);
         }
@@ -224,29 +304,45 @@ public sealed class AutoMemberSystem
         }
     }
 
-    private async Task<bool> WasUserGrantedMembershipBefore(Snowflake snowflake)
-    {
-        if (_ddbCache.Contains(snowflake.ID.ToString()) && (bool)_ddbCache[snowflake.ID.ToString()])
-            return true;
+	private async IAsyncEnumerable<KeyValuePair<Snowflake, InstarDatabaseEntry<InstarUserData>>> CreateMissingUsers(IEnumerable<IGuildUser> users)
+	{
+		foreach (var user in users)
+		{
+			InstarDatabaseEntry<InstarUserData>? dbUser;
+			try
+			{
+				await _ddbService.CreateUserAsync(InstarUserData.CreateFrom(user));
 
-        var grantedMembership = await _ddbService.GetUserMembership(snowflake.ID);
-        if (grantedMembership is null)
-            return false;
-        
-        // Cache for 6-hour sliding window.  If accessed, time is reset.
-        _ddbCache.Add(snowflake.ID.ToString(), grantedMembership.Value, new CacheItemPolicy
-        {
-            SlidingExpiration = TimeSpan.FromHours(6)
-        });
+				// Now, get the user we just created
+				dbUser = await _ddbService.GetUserAsync(user.Id);
 
-        return grantedMembership.Value;
-    }
+				if (dbUser is null)
+				{
+					// Welp, something's wrong with DynamoDB that isn't throwing an
+					// exception with CreateUserAsync or GetUserAsync. At this point,
+					// we expect the user to be present in DynamoDB, so we'll treat
+					// this as an error.
+					throw new BadStateException("Expected user to be created and returned from DynamoDB");
+				}
+			} catch (Exception ex)
+			{
+				await _metricService.Emit(Metric.AMS_DynamoFailures, 1);
+				Log.Error(ex, "Failed to get or create user with ID {UserID} in DynamoDB", user.Id);
+				continue;
+			}
 
-    private async Task GrantMembership(InstarDynamicConfiguration cfg, IGuildUser user)
+			yield return new KeyValuePair<Snowflake, InstarDatabaseEntry<InstarUserData>>(user.Id, dbUser);
+		}
+	}
+
+	private async Task GrantMembership(InstarDynamicConfiguration cfg, IGuildUser user,
+        InstarDatabaseEntry<InstarUserData> dbUser)
     {
         await user.AddRoleAsync(cfg.MemberRoleID);
         await user.RemoveRoleAsync(cfg.NewMemberRoleID);
-        await _ddbService.UpdateUserMembership(user.Id, true);
+        
+        dbUser.Data.Position = InstarUserPosition.Member;
+        await dbUser.UpdateAsync();
 
         // Remove the cache entry
         if (_ddbCache.Contains(user.Id.ToString()))
@@ -256,10 +352,25 @@ public sealed class AutoMemberSystem
         _introductionPosters.TryRemove(user.Id, out _);
     }
 
-    public async Task<MembershipEligibility> CheckEligibility(IGuildUser user)
+	/// <summary>
+	/// Determines the eligibility of a user for membership based on specific criteria.
+	/// </summary>
+	/// <param name="cfg">The current configuration from AppConfig.</param>
+	/// <param name="user">The user whose eligibility is being evaluated.</param>
+	/// <returns>An enumeration value of type <see cref="MembershipEligibility"/> that indicates the user's membership eligibility status.</returns>
+	/// <remarks>
+	///     The criteria for membership is as follows:
+	/// <list type="bullet">
+	///     <item>The user must have the required roles (see <see cref="CheckUserRequiredRoles"/>)</item>
+	///     <item>The user must be on the server for a configurable minimum amount of time</item>
+	///     <item>The user must have posted an introduction</item>
+	///     <item>The user must have posted enough messages in a configurable amount of time</item>
+	///     <item>The user must not have been issued a moderator action</item>
+	///     <item>The user must not already be a member</item>
+	/// </list>
+	/// </remarks>
+	public MembershipEligibility CheckEligibility(InstarDynamicConfiguration cfg, IGuildUser user)
     {
-        var cfg = await _dynamicConfig.GetConfig();
-        
         // We need recent messages here, so load it into
         // context if it does not exist, such as when the
         // bot first starts and has not run AMS yet.
@@ -285,13 +396,25 @@ public sealed class AutoMemberSystem
         if (_punishedUsers.ContainsKey(user.Id))
             eligibility |= MembershipEligibility.PunishmentReceived;
 
-        if (eligibility != MembershipEligibility.Eligible)
-            eligibility |= MembershipEligibility.NotEligible;
+		if (user.RoleIds.Contains(cfg.AutoMemberConfig.HoldRole))
+			eligibility |= MembershipEligibility.AutoMemberHold;
+
+		if (eligibility != MembershipEligibility.Eligible)
+		{
+			eligibility &= ~MembershipEligibility.Eligible;
+			eligibility |= MembershipEligibility.NotEligible;
+		}
         
         Log.Verbose("User {User} ({UserID}) membership eligibility: {Eligibility}", user.Username, user.Id, eligibility);
         return eligibility;
     }
 
+    /// <summary>
+    /// Verifies if a user possesses the required roles for automatic membership based on the provided configuration.
+    /// </summary>
+    /// <param name="cfg">The dynamic configuration containing role requirements and settings for automatic membership.</param>
+    /// <param name="user">The user whose roles are being checked against the configuration.</param>
+    /// <returns>True if the user satisfies the role requirements; otherwise, false.</returns>
     private static bool CheckUserRequiredRoles(InstarDynamicConfiguration cfg, IGuildUser user)
     {
         // Auto Member Hold overrides all role permissions

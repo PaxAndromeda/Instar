@@ -12,6 +12,8 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.Services;
+using Serilog;
+using Serilog.Events;
 
 namespace InstarBot.Tests;
 
@@ -77,7 +79,7 @@ public static class TestUtilities
             "RespondAsync", Times.Once(),
             message, ItExpr.IsAny<Embed[]>(),
             false, ephemeral, ItExpr.IsAny<AllowedMentions>(), ItExpr.IsAny<RequestOptions>(),
-            ItExpr.IsAny<MessageComponent>(), ItExpr.IsAny<Embed>(), ItExpr.IsAny<PollProperties>());
+            ItExpr.IsAny<MessageComponent>(), ItExpr.IsAny<Embed>(), ItExpr.IsAny<PollProperties>(), ItExpr.IsAny<MessageFlags>());
     }
 
     public static IDiscordService SetupDiscordService(TestContext context = null!)
@@ -110,7 +112,7 @@ public static class TestUtilities
     public static Mock<T> SetupCommandMock<T>(TestContext context = null!)
         where T : BaseCommand
     {
-        // Quick check:  Do we have a constructor that takes IConfiguration?
+        // Quick check: Do we have a constructor that takes IConfiguration?
         var iConfigCtor = typeof(T).GetConstructors()
             .Any(n => n.GetParameters().Any(info => info.ParameterType == typeof(IConfiguration)));
 
@@ -131,7 +133,8 @@ public static class TestUtilities
                 It.IsAny<bool>(), ItExpr.IsNull<AllowedMentions>(), ItExpr.IsNull<RequestOptions>(),
                 ItExpr.IsNull<MessageComponent>(),
                 ItExpr.IsNull<Embed>(),
-                ItExpr.IsNull<PollProperties>())
+                ItExpr.IsNull<PollProperties>(),
+				ItExpr.IsNull<MessageFlags>())
             .Returns(Task.CompletedTask);
     }
 
@@ -236,5 +239,15 @@ public static class TestUtilities
 
             yield return value;
         }
+    }
+
+    public static void SetupLogging()
+    {
+        Log.Logger = new LoggerConfiguration()
+            .Enrich.FromLogContext()
+            .MinimumLevel.Is(LogEventLevel.Verbose)
+            .WriteTo.Console()
+            .CreateLogger();
+        Log.Warning("Logging is enabled for this unit test.");
     }
 }

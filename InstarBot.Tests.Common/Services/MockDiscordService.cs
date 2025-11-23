@@ -2,6 +2,7 @@ using Discord;
 using InstarBot.Tests.Models;
 using JetBrains.Annotations;
 using PaxAndromeda.Instar;
+using PaxAndromeda.Instar.Modals;
 using PaxAndromeda.Instar.Services;
 
 namespace InstarBot.Tests.Services;
@@ -10,16 +11,23 @@ public sealed class MockDiscordService : IDiscordService
 {
     private readonly IInstarGuild _guild;
     private readonly AsyncEvent<IGuildUser> _userJoinedEvent = new();
-    private readonly AsyncEvent<IMessage> _messageReceivedEvent = new();
-    private readonly AsyncEvent<Snowflake> _messageDeletedEvent = new();
+	private readonly AsyncEvent<UserUpdatedEventArgs> _userUpdatedEvent = new();
+	private readonly AsyncEvent<IMessage> _messageReceivedEvent = new();
+	private readonly AsyncEvent<Snowflake> _messageDeletedEvent = new();
 
-    public event Func<IGuildUser, Task> UserJoined
+	public event Func<IGuildUser, Task> UserJoined
     {
         add => _userJoinedEvent.Add(value);
         remove => _userJoinedEvent.Remove(value);
-    }
+	}
 
-    public event Func<IMessage, Task> MessageReceived
+	public event Func<UserUpdatedEventArgs, Task> UserUpdated
+	{
+		add => _userUpdatedEvent.Add(value);
+		remove => _userUpdatedEvent.Remove(value);
+	}
+
+	public event Func<IMessage, Task> MessageReceived
     {
         add => _messageReceivedEvent.Add(value);
         remove => _messageReceivedEvent.Remove(value);
@@ -62,14 +70,19 @@ public sealed class MockDiscordService : IDiscordService
         await foreach (var messageList in channel.GetMessagesAsync())
         foreach (var message in messageList)
             yield return message;
-    }
+	}
 
-    public async Task TriggerUserJoined(IGuildUser user)
-    {
-        await _userJoinedEvent.Invoke(user);
-    }
+	public async Task TriggerUserJoined(IGuildUser user)
+	{
+		await _userJoinedEvent.Invoke(user);
+	}
 
-    [UsedImplicitly]
+	public async Task TriggerUserUpdated(UserUpdatedEventArgs args)
+	{
+		await _userUpdatedEvent.Invoke(args);
+	}
+
+	[UsedImplicitly]
     public async Task TriggerMessageReceived(IMessage message)
     {
         await _messageReceivedEvent.Invoke(message);

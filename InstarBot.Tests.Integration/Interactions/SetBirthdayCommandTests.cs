@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
+using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Services;
 using Xunit;
 
@@ -13,13 +14,17 @@ public static class SetBirthdayCommandTests
 {
     private static (IInstarDDBService, Mock<SetBirthdayCommand>) SetupMocks(SetBirthdayContext context)
     {
+        TestUtilities.SetupLogging();
+        
         var ddbService = TestUtilities.GetServices().GetService<IInstarDDBService>();
         var cmd = TestUtilities.SetupCommandMock(() => new SetBirthdayCommand(ddbService!, new MockMetricService()), new TestContext
         {
             UserID = context.User.ID
         });
+        
+        ((MockInstarDDBService) ddbService!).Register(InstarUserData.CreateFrom(cmd.Object.Context.User!));
 
-        Assert.NotNull(ddbService);
+		ddbService.Should().NotBeNull();
 
         return (ddbService, cmd);
     }
@@ -44,7 +49,9 @@ public static class SetBirthdayCommandTests
 
         // Assert
         var date = context.ToDateTime();
-        (await ddb.GetUserBirthday(context.User.ID)).Should().Be(date.UtcDateTime);
+        
+        var ddbUser = await ddb.GetUserAsync(context.User.ID);
+        ddbUser!.Data.Birthday.Should().Be(date.UtcDateTime);
         TestUtilities.VerifyMessage(cmd, $"Your birthday was set to {date.DateTime:dddd, MMMM d, yyy}.", true);
     }
 

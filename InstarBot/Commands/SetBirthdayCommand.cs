@@ -14,9 +14,7 @@ namespace PaxAndromeda.Instar.Commands;
 public class SetBirthdayCommand(IInstarDDBService ddbService, IMetricService metricService) : BaseCommand
 {
     [UsedImplicitly]
-    [RequireOwner]
-    [DefaultMemberPermissions(GuildPermission.Administrator)]
-    [SlashCommand("setbirthday", "Sets your birthday on the server.")]
+	[SlashCommand("setbirthday", "Sets your birthday on the server.")]
     public async Task SetBirthday(
         [MinValue(1)] [MaxValue(12)] [Summary(description: "The month you were born.")]
         Month month,
@@ -30,6 +28,15 @@ public class SetBirthdayCommand(IInstarDDBService ddbService, IMetricService met
         [Autocomplete]
         int tzOffset = 0)
     {
+        if (Context.User is null)
+        {
+            Log.Warning("Context.User was null");
+            await RespondAsync(
+                "An unknown error has occurred. Instar developers have been notified.",
+                ephemeral: true);
+            return;
+        }
+        
         if ((int)month is < 0 or > 12)
         {
             await RespondAsync(
@@ -71,10 +78,13 @@ public class SetBirthdayCommand(IInstarDDBService ddbService, IMetricService met
                 dtUtc);
         // TODO:  Notify staff?
 
-        var ok = await ddbService.UpdateUserBirthday(new Snowflake(Context.User!.Id), dtUtc);
-
-        if (ok)
+        try
         {
+            var dbUser = await ddbService.GetOrCreateUserAsync(Context.User);
+            dbUser.Data.Birthday = dtUtc;
+            await dbUser.UpdateAsync();
+
+
             Log.Information("User {UserID} birthday set to {DateTime} (UTC time calculated as {UtcTime})",
                 Context.User!.Id,
                 dtLocal, dtUtc);
@@ -82,9 +92,9 @@ public class SetBirthdayCommand(IInstarDDBService ddbService, IMetricService met
             await RespondAsync($"Your birthday was set to {dtLocal:D}.", ephemeral: true);
             await metricService.Emit(Metric.BS_BirthdaysSet, 1);
         }
-        else
+        catch (Exception ex)
         {
-            Log.Warning("Failed to update {UserID}'s birthday due to a DynamoDB failure",
+            Log.Error(ex, "Failed to update {UserID}'s birthday due to a DynamoDB failure",
                 Context.User!.Id);
 
             await RespondAsync("Your birthday could not be set at this time.  Please try again later.",

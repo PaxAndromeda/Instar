@@ -30,7 +30,8 @@ public sealed class CloudwatchMetricService : IMetricService
             var datum = new MetricDatum
             {
                 MetricName = nameAttr is not null ? nameAttr.Name : Enum.GetName(metric),
-                Value = value
+                Value = value,
+				Dimensions = []
             };
 
             var attrs = metric.GetAttributesOfType<MetricDimensionAttribute>();

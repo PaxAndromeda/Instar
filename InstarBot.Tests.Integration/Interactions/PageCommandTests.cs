@@ -68,7 +68,7 @@ public static class PageCommandTests
             "RespondAsync", Times.Once(),
             expectedString, ItExpr.IsNull<Embed[]>(),
             false, false, AllowedMentions.All, ItExpr.IsNull<RequestOptions>(),
-            ItExpr.IsNull<MessageComponent>(), ItExpr.IsAny<Embed>(), ItExpr.IsAny<PollProperties>());
+            ItExpr.IsNull<MessageComponent>(), ItExpr.IsAny<Embed>(), ItExpr.IsAny<PollProperties>(), ItExpr.IsAny<MessageFlags>());
     }
 
     [Fact(DisplayName = "User should be able to page when authorized")]
