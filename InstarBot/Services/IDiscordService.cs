@@ -1,11 +1,13 @@
 using Discord;
+using PaxAndromeda.Instar.Modals;
 
 namespace PaxAndromeda.Instar.Services;
 
 public interface IDiscordService
 {
     event Func<IGuildUser, Task> UserJoined;
-    event Func<IMessage, Task> MessageReceived;
+	event Func<UserUpdatedEventArgs, Task> UserUpdated;
+	event Func<IMessage, Task> MessageReceived;
     event Func<Snowflake, Task> MessageDeleted;
     
     Task Start(IServiceProvider provider);

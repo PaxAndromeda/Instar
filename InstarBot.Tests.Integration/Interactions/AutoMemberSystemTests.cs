@@ -3,7 +3,9 @@ using InstarBot.Tests.Models;
 using InstarBot.Tests.Services;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.ConfigModels;
+using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Gaius;
+using PaxAndromeda.Instar.Modals;
 using PaxAndromeda.Instar.Services;
 using Xunit;
 
@@ -18,7 +20,7 @@ public static class AutoMemberSystemTests
     private static readonly Snowflake SheHer = new(796578609535647765);
     private static readonly Snowflake AutoMemberHold = new(966434762032054282);
 
-    private static async Task<AutoMemberSystem> SetupTest(AutoMemberSystemContext scenarioContext)
+    private static AutoMemberSystem SetupTest(AutoMemberSystemContext scenarioContext)
     {
         var testContext = scenarioContext.TestContext;
 
@@ -38,19 +40,22 @@ public static class AutoMemberSystemTests
         var amsConfig = scenarioContext.Config.AutoMemberConfig;
 
         var ddbService = new MockInstarDDBService();
-        if (firstSeenTime > 0)
-            await ddbService.UpdateUserJoinDate(userId, DateTime.UtcNow - TimeSpan.FromHours(firstSeenTime));
-        if (grantedMembershipBefore)
-            await ddbService.UpdateUserMembership(userId, grantedMembershipBefore);
+
+		var user = new TestGuildUser
+		{
+			Id = userId,
+			Username = "username",
+			JoinedAt = DateTimeOffset.Now - TimeSpan.FromHours(relativeJoinTime),
+			RoleIds = roles.Select(n => n.ID).ToList().AsReadOnly()
+		};
+
+		var userData = InstarUserData.CreateFrom(user);
+		userData.Position = grantedMembershipBefore ? InstarUserPosition.Member : InstarUserPosition.NewMember;
+
+		if (!scenarioContext.SuppressDDBEntry)
+			ddbService.Register(userData);
 
         testContext.AddRoles(roles);
-
-        var user = new TestGuildUser
-        {
-            Id = userId,
-            JoinedAt = DateTimeOffset.Now - TimeSpan.FromHours(relativeJoinTime),
-            RoleIds = roles.Select(n => n.ID).ToList().AsReadOnly()
-        };
 
         testContext.GuildUsers.Add(user);
 
@@ -69,6 +74,7 @@ public static class AutoMemberSystemTests
         var ams = new AutoMemberSystem(config, discordService, gaiusApiService, ddbService, new MockMetricService());
 
         scenarioContext.User = user;
+		scenarioContext.DynamoService = ddbService;
 
         return ams;
     }
@@ -85,7 +91,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -106,7 +112,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -127,7 +133,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -147,7 +153,7 @@ public static class AutoMemberSystemTests
             .WithMessages(10)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -167,7 +173,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -186,7 +192,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -206,7 +212,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -226,7 +232,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -246,7 +252,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -267,7 +273,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -288,7 +294,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -309,7 +315,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+        var ams = SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -331,7 +337,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        await SetupTest(context);
+        SetupTest(context);
 
         // Act
         var service = context.DiscordService as MockDiscordService;
@@ -346,6 +352,68 @@ public static class AutoMemberSystemTests
         context.AssertMember();
     }
 
+	[Fact(DisplayName = "The Dynamo record for a user should be updated when the user's username changes")]
+	public static async Task AutoMemberSystem_MemberMetadataUpdated_ShouldBeReflectedInDynamo()
+	{
+		// Arrange
+		const string NewUsername = "fred";
+
+		var context = await AutoMemberSystemContext.Builder()
+			.Joined(TimeSpan.FromHours(1))
+			.FirstJoined(TimeSpan.FromDays(7))
+			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
+			.HasPostedIntroduction()
+			.HasBeenGrantedMembershipBefore()
+			.WithMessages(100)
+			.Build();
+
+		SetupTest(context);
+
+		// Make sure the user is in the database
+		context.DynamoService.Should().NotBeNull(because: "Test is invalid if DynamoService is not set");
+		await context.DynamoService.CreateUserAsync(InstarUserData.CreateFrom(context.User!));
+
+		// Act
+		MockDiscordService mds = (MockDiscordService) context.DiscordService!;
+
+		var newUser = context.User!.Clone();
+		newUser.Username = NewUsername;
+
+		await mds.TriggerUserUpdated(new UserUpdatedEventArgs(context.UserID, context.User, newUser));
+
+		// Assert
+		var ddbUser = await context.DynamoService.GetUserAsync(context.UserID);
+
+		ddbUser.Should().NotBeNull();
+		ddbUser.Data.Username.Should().Be(NewUsername);
+
+		ddbUser.Data.Usernames.Should().NotBeNull();
+		ddbUser.Data.Usernames.Count.Should().Be(2);
+		ddbUser.Data.Usernames.Should().Contain(n => n.Data != null && n.Data.Equals(NewUsername, StringComparison.Ordinal));
+	}
+
+	[Fact(DisplayName = "A user should be created in DynamoDB if they're eligible for membership but missing in DDB")]
+	public static async Task AutoMemberSystem_MemberEligibleButMissingInDDB_ShouldBeCreatedAndGrantedMembership()
+	{
+
+		// Arrange
+		var context = await AutoMemberSystemContext.Builder()
+			.Joined(TimeSpan.FromHours(36))
+			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
+			.HasPostedIntroduction()
+			.WithMessages(100)
+			.SuppressDDBEntry()
+			.Build();
+
+		var ams = SetupTest(context);
+
+		// Act
+		await ams.RunAsync();
+
+		// Assert
+		context.AssertMember();
+	}
+
     private record AutoMemberSystemContext(
         Snowflake UserID,
         int HoursSinceJoined,
@@ -354,6 +422,7 @@ public static class AutoMemberSystemTests
         int MessagesLast24Hours,
         int FirstJoinTime,
         bool GrantedMembershipBefore,
+		bool SuppressDDBEntry,
         TestContext TestContext,
         InstarDynamicConfiguration Config)
     {
@@ -361,6 +430,7 @@ public static class AutoMemberSystemTests
 
         public IDiscordService? DiscordService { get; set; }
         public TestGuildUser? User { get; set; }
+        public IInstarDDBService? DynamoService { get ; set ; }
 
         public void AssertMember()
         {
@@ -394,8 +464,10 @@ public static class AutoMemberSystemTests
         private bool _gaiusWarned;
         private int _firstJoinTime;
         private bool _grantedMembershipBefore;
+		private bool _suppressDDB;
 
-        public AutoMemberSystemContextBuilder Joined(TimeSpan timeAgo)
+
+		public AutoMemberSystemContextBuilder Joined(TimeSpan timeAgo)
         {
             _hoursSinceJoined = (int) Math.Round(timeAgo.TotalHours);
             return this;
@@ -446,9 +518,15 @@ public static class AutoMemberSystemTests
         {
             _grantedMembershipBefore = true;
             return this;
-        }
+		}
 
-        public async Task<AutoMemberSystemContext> Build()
+		public AutoMemberSystemContextBuilder SuppressDDBEntry()
+		{
+			_suppressDDB = true;
+			return this;
+		}
+
+		public async Task<AutoMemberSystemContext> Build()
         {
             var config = await TestUtilities.GetDynamicConfiguration().GetConfig();
 
@@ -487,7 +565,8 @@ public static class AutoMemberSystemTests
                 _messagesLast24Hours,
                 _firstJoinTime,
                 _grantedMembershipBefore,
-                testContext,
+				_suppressDDB,
+				testContext,
                 config);
         }
     }

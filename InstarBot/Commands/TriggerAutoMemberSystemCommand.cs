@@ -5,7 +5,7 @@ using PaxAndromeda.Instar.Services;
 
 namespace PaxAndromeda.Instar.Commands;
 
-public sealed class TriggerAutoMemberSystemCommand(AutoMemberSystem ams) : BaseCommand
+public sealed class TriggerAutoMemberSystemCommand(IAutoMemberSystem ams) : BaseCommand
 {
     [UsedImplicitly]
     [RequireOwner]

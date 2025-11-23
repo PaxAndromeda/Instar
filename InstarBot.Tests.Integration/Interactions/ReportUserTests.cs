@@ -39,7 +39,7 @@ public static class ReportUserTests
             It.IsAny<ISticker[]>(),
             It.IsAny<Embed[]>(), It.IsAny<MessageFlags>(), It.IsAny<PollProperties>()));
 
-        Assert.NotNull(context.ResultEmbed);
+		context.ResultEmbed.Should().NotBeNull();
         var embed = context.ResultEmbed;
 
         embed.Author.Should().NotBeNull();

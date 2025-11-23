@@ -29,10 +29,9 @@ internal static class Program
         var configPath = "Config/Instar.debug.conf.json";
 #else
         var configPath = "Config/Instar.conf.json";
-#endif
-
         if (!string.IsNullOrEmpty(cli.ConfigPath))
             configPath = cli.ConfigPath;
+#endif
         
         Log.Information("Config path is {Path}", configPath);
         IConfiguration config = new ConfigurationBuilder()
@@ -125,7 +124,7 @@ internal static class Program
         services.AddTransient<IMetricService, CloudwatchMetricService>();
         services.AddTransient<IGaiusAPIService, GaiusAPIService>();
         services.AddSingleton<IDiscordService, DiscordService>();
-        services.AddSingleton<AutoMemberSystem>();
+        services.AddSingleton<IAutoMemberSystem, AutoMemberSystem>();
         services.AddSingleton<IDynamicConfigService, AWSDynamicConfigService>();
         
         // Commands & Interactions
@@ -133,6 +132,7 @@ internal static class Program
         services.AddTransient<SetBirthdayCommand>();
         services.AddSingleton<PageCommand>();
         services.AddTransient<IContextCommand, ReportUserCommand>();
+		services.AddTransient<AutoMemberHoldCommand>();
 
         return services.BuildServiceProvider();
     }

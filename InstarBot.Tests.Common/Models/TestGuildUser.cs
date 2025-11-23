@@ -185,4 +185,10 @@ public sealed class TestGuildUser : IGuildUser
     public string AvatarDecorationHash => throw new NotImplementedException();
 
     public ulong? AvatarDecorationSkuId => throw new NotImplementedException();
+    public PrimaryGuild? PrimaryGuild { get; }
+
+    public TestGuildUser Clone()
+	{
+		return (TestGuildUser) MemberwiseClone();
+	}
 }

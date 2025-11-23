@@ -37,8 +37,16 @@ public enum Metric
     [MetricDimension("Service", "Auto Member System")]
     [MetricName("Users Granted Membership")]
     AMS_UsersGrantedMembership,
-    
-    [MetricDimension("Service", "Discord")]
+
+	[MetricDimension("Service", "Auto Member System")]
+	[MetricName("DynamoDB Failures")]
+	AMS_DynamoFailures,
+
+	[MetricDimension("Service", "Auto Member System")]
+	[MetricName("AMH Application Failures")]
+	AMS_AMHFailures,
+
+	[MetricDimension("Service", "Discord")]
     [MetricName("Messages Sent")]
     Discord_MessagesSent,
     
