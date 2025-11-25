@@ -33,7 +33,8 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 		{
 			if (user is not IGuildUser guildUser)
 			{
-				await RespondAsync($"Error while attempting to withhold membership for <@{user.Id}>: User is not a guild member.", ephemeral: true);
+				
+				await RespondAsync(string.Format(Strings.Command_AutoMemberHold_Error_NotGuildMember, user.Id), ephemeral: true);
 				return;
 			}
 
@@ -41,11 +42,17 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 
 			if (guildUser.RoleIds.Contains(config.MemberRoleID))
 			{
-				await RespondAsync($"Error while attempting to withhold membership for <@{user.Id}>: User is already a member.", ephemeral: true);
+				await RespondAsync(string.Format(Strings.Command_AutoMemberHold_Error_AlreadyMember, user.Id), ephemeral: true);
 				return;
 			}
 
 			var dbUser = await ddbService.GetOrCreateUserAsync(guildUser);
+
+			if (dbUser.Data.AutoMemberHoldRecord is not null)
+			{
+				await RespondAsync(string.Format(Strings.Command_AutoMemberHold_Error_AMHAlreadyExists, user.Id), ephemeral: true);
+				return;
+			}
 
 			dbUser.Data.AutoMemberHoldRecord = new AutoMemberHoldRecord
 			{
@@ -56,7 +63,7 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 			await dbUser.UpdateAsync();
 
 			// TODO: configurable duration?
-			await RespondAsync($"Membership for user <@{user.Id}> has been withheld. Staff will be notified in one week to review.", ephemeral: true);
+			await RespondAsync(string.Format(Strings.Command_AutoMemberHold_Success, user.Id), ephemeral: true);
 		} catch (Exception ex)
 		{
 			await metricService.Emit(Metric.AMS_AMHFailures, 1);
@@ -65,7 +72,7 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 			try
 			{
 				// It is entirely possible that RespondAsync threw this error.
-				await RespondAsync($"Error while attempting to withhold membership for <@{user.Id}>: An unexpected error has occurred while configuring the AMH.", ephemeral: true);
+				await RespondAsync(string.Format(Strings.Command_AutoMemberHold_Error_Unexpected, user.Id), ephemeral: true);
 			} catch
 			{
 				// swallow the exception
@@ -85,7 +92,7 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 
 		if (user is not IGuildUser guildUser)
 		{
-			await RespondAsync($"Error while attempting to remove auto member hold for <@{user.Id}>: User is not a guild member.", ephemeral: true);
+			await RespondAsync(string.Format(Strings.Command_AutoMemberUnhold_Error_NotGuildMember, user.Id), ephemeral: true);
 			return;
 		}
 
@@ -94,14 +101,14 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 			var dbUser = await ddbService.GetOrCreateUserAsync(guildUser);
 			if (dbUser.Data.AutoMemberHoldRecord is null)
 			{
-				await RespondAsync($"Error while attempting to remove auto member hold for <@{user.Id}>: User does not have an active auto member hold.", ephemeral: true);
+				await RespondAsync(string.Format(Strings.Command_AutoMemberUnhold_Error_NoActiveHold, user.Id), ephemeral: true);
 				return;
 			}
 
 			dbUser.Data.AutoMemberHoldRecord = null;
 			await dbUser.UpdateAsync();
 
-			await RespondAsync($"Auto member hold for user <@{user.Id}> has been removed.", ephemeral: true);
+			await RespondAsync(string.Format(Strings.Command_AutoMemberUnhold_Success, user.Id), ephemeral: true);
 		}
 		catch (Exception ex)
 		{
@@ -110,7 +117,7 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 
 			try
 			{
-				await RespondAsync($"Error while attempting to remove auto member hold for <@{user.Id}>: An unexpected error has occurred while removing the AMH.", ephemeral: true);
+				await RespondAsync(string.Format(Strings.Command_AutoMemberUnhold_Error_Unexpected, user.Id), ephemeral: true);
 			}
 			catch
 			{

@@ -1,13 +1,14 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Ardalis.GuardClauses;
+﻿using Ardalis.GuardClauses;
 using Discord;
 using Discord.Interactions;
 using JetBrains.Annotations;
 using PaxAndromeda.Instar.ConfigModels;
+using PaxAndromeda.Instar.Embeds;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Preconditions;
 using PaxAndromeda.Instar.Services;
 using Serilog;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PaxAndromeda.Instar.Commands;
 
@@ -51,7 +52,7 @@ public class PageCommand(TeamService teamService, IMetricService metricService) 
 
             string mention;
             if (team == PageTarget.Test)
-                mention = "This is a __**TEST**__ page.";
+                mention = Strings.Command_Page_TestPageMessage;
             else if (teamLead)
                 mention = await teamService.GetTeamLeadMention(team);
             else
@@ -60,7 +61,7 @@ public class PageCommand(TeamService teamService, IMetricService metricService) 
             Log.Debug("Emitting page to {ChannelName}", Context.Channel?.Name);
             await RespondAsync(
                 mention,
-                embed: BuildEmbed(reason, message, user, channel, userTeam!, Context.User),
+                embed: new InstarPageEmbed(reason, message, user, channel, userTeam!, Context.User).Build(),
                 allowedMentions: AllowedMentions.All);
 
             await metricService.Emit(Metric.Paging_SentPages, 1);
@@ -68,7 +69,7 @@ public class PageCommand(TeamService teamService, IMetricService metricService) 
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to send page from {User}", Context.User.Id);
-            await RespondAsync("Failed to process command due to an internal server error.", ephemeral: true);
+            await RespondAsync(Strings.Command_Page_Error_Unexpected, ephemeral: true);
         }
     }
 
@@ -88,7 +89,7 @@ public class PageCommand(TeamService teamService, IMetricService metricService) 
 
         if (team is null)
         {
-            response = "You are not authorized to use this command.";
+            response = Strings.Command_Page_Error_NotAuthorized;
             Log.Information("{User} was not authorized to send a page", user.Id);
             return false;
         }
@@ -99,7 +100,7 @@ public class PageCommand(TeamService teamService, IMetricService metricService) 
         // Check permissions.  Only mod+ can send an "all" page
         if (team.Priority > 3 && pageTarget == PageTarget.All) // i.e. Helper, Community Manager
         {
-            response = "You are not authorized to send a page to the entire staff team.";
+            response = Strings.Command_Page_Error_FullTeamNotAuthorized;
             Log.Information("{User} was not authorized to send a page to the entire staff team", user.Id);
             return false;
         }
@@ -107,53 +108,8 @@ public class PageCommand(TeamService teamService, IMetricService metricService) 
         if (pageTarget != PageTarget.All || !teamLead)
             return true;
 
-        response =
-            "Failed to send page.  The 'All' team does not have a teamleader.  If intended to page the owner, please select the Owner as the team.";
-        return false;
-    }
+		response = Strings.Command_Page_Error_NoAllTeamlead;
 
-    /// <summary>
-    ///     Builds the page embed.
-    /// </summary>
-    /// <param name="reason">The reason for the page.</param>
-    /// <param name="message">A message link.  May be null.</param>
-    /// <param name="targetUser">The user being paged about.  May be null.</param>
-    /// <param name="channel">The channel being paged about.  May be null.</param>
-    /// <param name="userTeam">The paging user's team</param>
-    /// <param name="pagingUser">The paging user</param>
-    /// <returns>A standard embed embodying all parameters provided</returns>
-    private static Embed BuildEmbed(
-        string reason,
-        string message,
-        IUser? targetUser,
-        IChannel? channel,
-        Team userTeam,
-        IGuildUser pagingUser)
-    {
-        var fields = new List<EmbedFieldBuilder>();
-
-        if (targetUser is not null)
-            fields.Add(new EmbedFieldBuilder().WithIsInline(true).WithName("User").WithValue($"<@{targetUser.Id}>"));
-
-        if (channel is not null)
-            fields.Add(new EmbedFieldBuilder().WithIsInline(true).WithName("Channel").WithValue($"<#{channel.Id}>"));
-
-        if (!string.IsNullOrEmpty(message))
-            fields.Add(new EmbedFieldBuilder().WithIsInline(true).WithName("Message").WithValue(message));
-
-        var builder = new EmbedBuilder()
-            // Set up all the basic stuff first
-            .WithCurrentTimestamp()
-            .WithColor(userTeam.Color)
-            .WithAuthor(pagingUser.Nickname ?? pagingUser.Username, pagingUser.GetAvatarUrl())
-            .WithFooter(new EmbedFooterBuilder()
-                .WithText("Instar Paging System")
-                .WithIconUrl("https://spacegirl.s3.us-east-1.amazonaws.com/instar.png"))
-            // Description
-            .WithDescription($"```{reason}```")
-            .WithFields(fields);
-
-        var embed = builder.Build();
-        return embed;
+		return false;
     }
 }

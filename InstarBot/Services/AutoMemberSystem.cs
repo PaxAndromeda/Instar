@@ -401,6 +401,8 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
 
 		if (eligibility != MembershipEligibility.Eligible)
 		{
+			// Unset Eligible flag, add NotEligible flag.
+			// OPTIMIZE: Do we need the NotEligible flag at all?
 			eligibility &= ~MembershipEligibility.Eligible;
 			eligibility |= MembershipEligibility.NotEligible;
 		}

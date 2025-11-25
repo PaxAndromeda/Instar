@@ -1,4 +1,5 @@
 ﻿using Discord;
+using InstarBot.Tests.Models;
 using InstarBot.Tests.Services;
 using Moq;
 using Moq.Protected;
@@ -10,6 +11,8 @@ namespace InstarBot.Tests.Integration.Interactions;
 
 public static class PageCommandTests
 {
+	private const string TestReason = "Test reason for paging";
+
     private static async Task<Mock<PageCommand>> SetupCommandMock(PageCommandTestContext context)
     {
         // Treat the Test page target as a regular non-staff user on the server
@@ -41,40 +44,54 @@ public static class PageCommandTests
 
     private static async Task VerifyPageEmbedEmitted(Mock<PageCommand> command, PageCommandTestContext context)
     {
-        var pageTarget = context.PageTarget;
+		var verifier = EmbedVerifier.Builder()
+			.WithFooterText(Strings.Embed_Page_Footer)
+			.WithDescription("```{0}```");
 
-        string expectedString;
+		if (context.TargetUser is not null)
+			verifier = verifier.WithField(
+				"User",
+				$"<@{context.TargetUser.Id}>");
+		
+		if (context.TargetChannel is not null)
+			verifier = verifier.WithField(
+				"Channel",
+				$"<#{context.TargetChannel.Id}>");
 
-        if (context.PagingTeamLeader)
-            expectedString = $"<@{await GetTeamLead(pageTarget)}>";
-        else
-            switch (pageTarget)
-            {
-                case PageTarget.All:
-                    expectedString = string.Join(' ',
-                        await TestUtilities.GetTeams(PageTarget.All).Select(n => Snowflake.GetMention(() => n.ID))
-                            .ToArrayAsync());
-                    break;
-                case PageTarget.Test:
-                    expectedString = "This is a __**TEST**__ page.";
-                    break;
-                default:
-                    var team = await TestUtilities.GetTeams(pageTarget).FirstAsync();
-                    expectedString = Snowflake.GetMention(() => team.ID);
-                    break;
-            }
+		if (context.Message is not null)
+			verifier = verifier.WithField(
+				"Message",
+				$"{context.Message}");
 
-        command.Protected().Verify(
-            "RespondAsync", Times.Once(),
-            expectedString, ItExpr.IsNull<Embed[]>(),
-            false, false, AllowedMentions.All, ItExpr.IsNull<RequestOptions>(),
-            ItExpr.IsNull<MessageComponent>(), ItExpr.IsAny<Embed>(), ItExpr.IsAny<PollProperties>(), ItExpr.IsAny<MessageFlags>());
+		string messageFormat;
+		if (context.PagingTeamLeader)
+			messageFormat = "<@{0}>";
+		else
+			switch (context.PageTarget)
+			{
+				case PageTarget.All:
+					messageFormat = string.Join(' ',
+						await TestUtilities.GetTeams(PageTarget.All).Select(n => Snowflake.GetMention(() => n.ID))
+							.ToArrayAsync());
+					break;
+				case PageTarget.Test:
+					messageFormat = Strings.Command_Page_TestPageMessage;
+					break;
+				default:
+					var team = await TestUtilities.GetTeams(context.PageTarget).FirstAsync();
+					messageFormat = Snowflake.GetMention(() => team.ID);
+					break;
+			}
+
+
+		TestUtilities.VerifyEmbed(command, verifier.Build(), messageFormat);
     }
 
     [Fact(DisplayName = "User should be able to page when authorized")]
     public static async Task PageCommand_Authorized_WhenPagingTeam_ShouldPageCorrectly()
     {
         // Arrange
+		TestUtilities.SetupLogging();
         var context = new PageCommandTestContext(
             PageTarget.Owner,
             PageTarget.Moderator,
@@ -84,32 +101,54 @@ public static class PageCommandTests
         var command = await SetupCommandMock(context);
 
         // Act
-        await command.Object.Page(context.PageTarget, "This is a test reason", context.PagingTeamLeader, string.Empty);
+        await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
         // Assert
         await VerifyPageEmbedEmitted(command, context);
-    }
+	}
 
-    [Fact(DisplayName = "User should be able to page a team's teamleader")]
-    public static async Task PageCommand_Authorized_WhenPagingTeamLeader_ShouldPageCorrectly()
-    {
-        // Arrange
-        var context = new PageCommandTestContext(
-            PageTarget.Owner,
-            PageTarget.Moderator,
-            true
-        );
+	[Fact(DisplayName = "User should be able to page a team's teamleader")]
+	public static async Task PageCommand_Authorized_WhenPagingTeamLeader_ShouldPageCorrectly()
+	{
+		// Arrange
+		var context = new PageCommandTestContext(
+			PageTarget.Owner,
+			PageTarget.Moderator,
+			true
+		);
 
-        var command = await SetupCommandMock(context);
+		var command = await SetupCommandMock(context);
 
-        // Act
-        await command.Object.Page(context.PageTarget, "This is a test reason", context.PagingTeamLeader, string.Empty);
+		// Act
+		await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
-        // Assert
-        await VerifyPageEmbedEmitted(command, context);
-    }
+		// Assert
+		await VerifyPageEmbedEmitted(command, context);
+	}
 
-    [Fact(DisplayName = "Any staff member should be able to use the Test page")]
+	[Fact(DisplayName = "User should be able to page a with user, channel and message")]
+	public static async Task PageCommand_Authorized_WhenPagingWithData_ShouldPageCorrectly()
+	{
+		// Arrange
+		var context = new PageCommandTestContext(
+			PageTarget.Owner,
+			PageTarget.Moderator,
+			true,
+			TargetUser: new TestUser(Snowflake.Generate()),
+			TargetChannel: new TestChannel(Snowflake.Generate()),
+			Message: "<message link>"
+		);
+
+		var command = await SetupCommandMock(context);
+
+		// Act
+		await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, context.Message!, context.TargetUser, context.TargetChannel);
+
+		// Assert
+		await VerifyPageEmbedEmitted(command, context);
+	}
+
+	[Fact(DisplayName = "Any staff member should be able to use the Test page")]
     public static async Task PageCommand_AnyStaffMember_WhenPagingTest_ShouldPageCorrectly()
     {
         var targets = Enum.GetValues<PageTarget>().Except([PageTarget.All, PageTarget.Test]);
@@ -126,7 +165,7 @@ public static class PageCommandTests
             var command = await SetupCommandMock(context);
 
             // Act
-            await command.Object.Page(context.PageTarget, "This is a test reason", context.PagingTeamLeader,
+            await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader,
                 string.Empty);
 
             // Assert
@@ -147,7 +186,7 @@ public static class PageCommandTests
         var command = await SetupCommandMock(context);
 
         // Act
-        await command.Object.Page(context.PageTarget, "This is a test reason", context.PagingTeamLeader, string.Empty);
+        await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
         // Assert
         await VerifyPageEmbedEmitted(command, context);
@@ -166,12 +205,12 @@ public static class PageCommandTests
         var command = await SetupCommandMock(context);
 
         // Act
-        await command.Object.Page(context.PageTarget, "This is a test reason", context.PagingTeamLeader, string.Empty);
+        await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
         // Assert
         TestUtilities.VerifyMessage(
             command,
-            "Failed to send page.  The 'All' team does not have a teamleader.  If intended to page the owner, please select the Owner as the team.",
+            Strings.Command_Page_Error_NoAllTeamlead,
             true
         );
     }
@@ -189,12 +228,12 @@ public static class PageCommandTests
         var command = await SetupCommandMock(context);
 
         // Act
-        await command.Object.Page(context.PageTarget, "This is a test reason", context.PagingTeamLeader, string.Empty);
+        await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
         // Assert
         TestUtilities.VerifyMessage(
             command,
-            "You are not authorized to use this command.",
+			Strings.Command_Page_Error_NotAuthorized,
             true
         );
     }
@@ -212,14 +251,20 @@ public static class PageCommandTests
         var command = await SetupCommandMock(context);
 
         // Act
-        await command.Object.Page(context.PageTarget, "This is a test reason", context.PagingTeamLeader, string.Empty);
+        await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
         // Assert
         TestUtilities.VerifyMessage(
             command,
-            "You are not authorized to send a page to the entire staff team.",
+			Strings.Command_Page_Error_FullTeamNotAuthorized,
             true
         );
     } 
-    private record PageCommandTestContext(PageTarget UserTeamID, PageTarget PageTarget, bool PagingTeamLeader);
+    private record PageCommandTestContext(
+		PageTarget UserTeamID, 
+		PageTarget PageTarget, 
+		bool PagingTeamLeader,
+		IUser? TargetUser = null,
+		IChannel? TargetChannel = null,
+		string? Message = null);
 }

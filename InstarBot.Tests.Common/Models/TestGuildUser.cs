@@ -178,16 +178,16 @@ public sealed class TestGuildUser : IGuildUser
     /// </summary>
     public bool Changed { get; private set; }
 
-    public string GuildBannerHash => throw new NotImplementedException();
+    public string GuildBannerHash { get; set; } = null!;
 
-    public string GlobalName => throw new NotImplementedException();
+	public string GlobalName { get; set; } = null!;
 
-    public string AvatarDecorationHash => throw new NotImplementedException();
+	public string AvatarDecorationHash { get; set; } = null!;
 
-    public ulong? AvatarDecorationSkuId => throw new NotImplementedException();
-    public PrimaryGuild? PrimaryGuild { get; }
+	public ulong? AvatarDecorationSkuId { get; set; } = null!;
+	public PrimaryGuild? PrimaryGuild { get; set; } = null!;
 
-    public TestGuildUser Clone()
+	public TestGuildUser Clone()
 	{
 		return (TestGuildUser) MemberwiseClone();
 	}

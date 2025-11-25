@@ -23,6 +23,15 @@ public static class ReportUserTests
 
         var (command, interactionContext, channelMock) = SetupMocks(context);
 
+		var verifier = EmbedVerifier.Builder()
+			.WithFooterText(Strings.Embed_UserReport_Footer)
+			.WithField("Reason", $"```{context.Reason}```")
+			.WithField("Message Content", "{0}")
+			.WithField("User", "<@{0}>")
+			.WithField("Channel", "<#{0}>")
+			.WithField("Reported By", "<@{0}>")
+			.Build();
+
         // Act
         await command.Object.HandleCommand(interactionContext.Object);
         await command.Object.ModalResponse(new ReportMessageModal
@@ -31,13 +40,11 @@ public static class ReportUserTests
         });
 
         // Assert
-        TestUtilities.VerifyMessage(command, "Your report has been sent.", true);
+        TestUtilities.VerifyMessage(command, Strings.Command_ReportUser_ReportSent, true);
 
-        channelMock.Verify(n => n.SendMessageAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<Embed>(),
-            It.IsAny<RequestOptions>(),
-            It.IsAny<AllowedMentions>(), It.IsAny<MessageReference>(), It.IsAny<MessageComponent>(),
-            It.IsAny<ISticker[]>(),
-            It.IsAny<Embed[]>(), It.IsAny<MessageFlags>(), It.IsAny<PollProperties>()));
+
+		TestUtilities.VerifyChannelEmbed(channelMock, verifier, "{0}");
+
 
 		context.ResultEmbed.Should().NotBeNull();
         var embed = context.ResultEmbed;
@@ -68,7 +75,7 @@ public static class ReportUserTests
         });
 
         // Assert
-        TestUtilities.VerifyMessage(command, "Report expired.  Please try again.", true);
+        TestUtilities.VerifyMessage(command, Strings.Command_ReportUser_ReportExpired, true);
     }
 
     private static (Mock<ReportUserCommand>, Mock<IInstarMessageCommandInteraction>, Mock<ITextChannel>) SetupMocks(ReportContext context)
