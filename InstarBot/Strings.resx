@@ -1,0 +1,287 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Command_CheckEligibility_AMH_ContactStaff" xml:space="preserve">
+    <value>No, the staff will not accelerate this process by request.</value>
+  </data>
+  <data name="Command_CheckEligibility_AMH_MembershipWithheld" xml:space="preserve">
+    <value>Your membership is currently on hold due to an administrative override. This means that you will not be granted the Member role automatically.</value>
+  </data>
+  <data name="Command_CheckEligibility_AMH_WhatToDo" xml:space="preserve">
+    <value>The staff will override an administrative hold in time when an evaluation of your behavior has been completed by the staff.</value>
+  </data>
+  <data name="Command_CheckEligibility_AMH_Why" xml:space="preserve">
+    <value>Your activity has been flagged as unusual by our system. This can happen for a variety of reasons, including antisocial behavior, repeated rule violations in a short period of time, or other behavior that is deemed disruptive.</value>
+  </data>
+  <data name="Command_CheckEligibility_EligibleEmoji" xml:space="preserve">
+    <value>:white_check_mark:</value>
+  </data>
+  <data name="Command_CheckEligibility_EmbedTitle" xml:space="preserve">
+    <value>Membership Eligibility</value>
+    <comment>Title of the embed returned when calling /checkeligibility</comment>
+  </data>
+  <data name="Command_CheckEligibility_Error_Internal" xml:space="preserve">
+    <value>An internal error has occurred.  Please try again later.</value>
+  </data>
+  <data name="Command_CheckEligibility_IntroductionEligibility" xml:space="preserve">
+    <value>{0} **Introduction**</value>
+    <comment>{0} is an emoji, linked to Command_CheckEligibility_EligibleEmoji and  Command_CheckEligibility_NotEligibleEmoji</comment>
+  </data>
+  <data name="Command_CheckEligibility_JoinAgeEligibility" xml:space="preserve">
+    <value>{0} **Join Age**</value>
+    <comment>{0} is an emoji, linked to Command_CheckEligibility_EligibleEmoji and  Command_CheckEligibility_NotEligibleEmoji</comment>
+  </data>
+  <data name="Command_CheckEligibility_MessagesEligibility" xml:space="preserve">
+    <value>{0} **Messages** (last 24 hours)</value>
+    <comment>{0} is an emoji, linked to Command_CheckEligibility_EligibleEmoji and  Command_CheckEligibility_NotEligibleEmoji</comment>
+  </data>
+  <data name="Command_CheckEligibility_MissingItem_Introduction" xml:space="preserve">
+    <value>You have not posted an introduction in {0}.</value>
+    <comment>{0} is a link to the Introductions channel.</comment>
+  </data>
+  <data name="Command_CheckEligibility_MissingItem_Messages" xml:space="preserve">
+    <value>You have not posted {0} messages in the past {1} hours.</value>
+    <comment>{0} is the number of messages, and {1} is the  timeframe in hours they need to send them in.</comment>
+  </data>
+  <data name="Command_CheckEligibility_MissingItem_PunishmentReceived" xml:space="preserve">
+    <value>You have received a warning or moderator action.</value>
+  </data>
+  <data name="Command_CheckEligibility_MissingItem_Role" xml:space="preserve">
+    <value>You are missing {0} {1} role.</value>
+    <comment>{0} is an article matched to the value of {1}.  For example, "an age role" or "a gender identity role".</comment>
+  </data>
+  <data name="Command_CheckEligibility_MissingItem_TooYoung" xml:space="preserve">
+    <value>You have not been on the server for {0} hours yet.</value>
+    <comment>{0} is the number of hours pulled from config.</comment>
+  </data>
+  <data name="Command_CheckEligibility_ModActionsEligibility" xml:space="preserve">
+    <value>{0} **Mod Actions**</value>
+    <comment>{0} is an emoji, linked to Command_CheckEligibility_EligibleEmoji and  Command_CheckEligibility_NotEligibleEmoji</comment>
+  </data>
+  <data name="Command_CheckEligibility_NextRuntimeNote" xml:space="preserve">
+    <value>The Auto Member System will run &lt;t:{0}:R&gt;. Membership eligibility is subject to change at the time of evaluation.</value>
+    <comment>{0} is a unix timestamp measured in seconds.</comment>
+  </data>
+  <data name="Command_CheckEligibility_Error_NoMemberRoles" xml:space="preserve">
+    <value>You do not have the New Member or Member roles.  Please contact staff to have this corrected.</value>
+  </data>
+  <data name="Command_CheckEligibility_NotEligibleEmoji" xml:space="preserve">
+    <value>:x:</value>
+  </data>
+  <data name="Command_CheckEligibility_RolesEligibility" xml:space="preserve">
+    <value>{0} **Roles**</value>
+    <comment>{0} is an emoji, linked to Command_CheckEligibility_EligibleEmoji and  Command_CheckEligibility_NotEligibleEmoji</comment>
+  </data>
+  <data name="Embed_AMS_Footer" xml:space="preserve">
+    <value>Instar Auto Member System</value>
+  </data>
+  <data name="Command_CheckEligibility_Error_AlreadyMember" xml:space="preserve">
+    <value>You are already a member!</value>
+  </data>
+  <data name="Command_Eligibility_EligibleText" xml:space="preserve">
+    <value>At this time, &lt;@{0}&gt; is eligible for membership.</value>
+    <comment>{0} is the user's ID.</comment>
+  </data>
+  <data name="Command_Eligibility_IneligibleText" xml:space="preserve">
+    <value>At this time, &lt;@{0}&gt; is __not__ eligible for membership.</value>
+    <comment>{0} is the user's ID.</comment>
+  </data>
+  <data name="Command_Eligibility_Error_AmbiguousHold" xml:space="preserve">
+    <value>Instar encountered an error while attempting to retrieve AMH details. If the user is otherwise eligible but is not being granted membership, it is possible that they are AMHed. Please try again later.</value>
+  </data>
+  <data name="Command_Eligibility_Section_AmbiguousHold" xml:space="preserve">
+    <value>:warning: Possible Auto Member Hold</value>
+  </data>
+  <data name="Command_Eligibility_Section_Hold" xml:space="preserve">
+    <value>:warning: Auto Member Hold</value>
+  </data>
+  <data name="Command_Eligibility_Section_Requirements" xml:space="preserve">
+    <value>Requirements</value>
+  </data>
+  <data name="Command_AutoMemberHold_Error_NotGuildMember" xml:space="preserve">
+    <value>Error while attempting to withhold membership for &lt;@{0}&gt;: User is not a guild member.</value>
+    <comment>{0} is the target user ID.</comment>
+  </data>
+  <data name="Command_AutoMemberHold_Error_AlreadyMember" xml:space="preserve">
+    <value>Error while attempting to withhold membership for &lt;@{0}&gt;: User is already a member.</value>
+    <comment>{0} is the target user ID.</comment>
+  </data>
+  <data name="Command_Eligibility_HoldFormat" xml:space="preserve">
+    <value>**Mod:** &lt;@{0}&gt;\r\n**Reason:**\r\n```{1}```\r\n**Date:** &lt;t:{2}:f&gt; (&lt;t:{2}:R&gt;)</value>
+    <comment>{0} is the moderator ID, {1} is the reason, and {2} is the unix timestamp of the issue date in seconds</comment>
+  </data>
+  <data name="Command_AutoMemberHold_Error_AMHAlreadyExists" xml:space="preserve">
+    <value>Error while attempting to withhold membership for &lt;@{0}&gt;: User already has an effective membership hold.</value>
+    <comment>{0} is the target user ID.</comment>
+  </data>
+  <data name="Command_AutoMemberHold_Error_Unexpected" xml:space="preserve">
+    <value>Error while attempting to withhold membership for &lt;@{0}&gt;: An unexpected error occurred while configuring the AMH.</value>
+    <comment>{0} is the target user ID.</comment>
+  </data>
+  <data name="Command_AutoMemberHold_Success" xml:space="preserve">
+    <value>Membership for user &lt;@{0}&gt; has been withheld. Staff will be notified in one week to review.</value>
+    <comment>{0} is the target user ID.</comment>
+  </data>
+  <data name="Command_AutoMemberUnhold_Error_NotGuildMember" xml:space="preserve">
+    <value>Error while attempting to remove auto member hold for &lt;@{0}&gt;: User is not a guild member.</value>
+    <comment>{0} is the target user ID.</comment>
+  </data>
+  <data name="Command_AutoMemberUnhold_Error_NoActiveHold" xml:space="preserve">
+    <value>Error while attempting to remove auto member hold for &lt;@{0}&gt;: User does not have an active auto member hold.</value>
+    <comment>{0} is the target user ID.</comment>
+  </data>
+  <data name="Command_AutoMemberUnhold_Error_Unexpected" xml:space="preserve">
+    <value>Error while attempting to remove auto member hold for &lt;@{0}&gt;: An unexpected error has occurred while removing the AMH.</value>
+    <comment>{0} is the target user ID.</comment>
+  </data>
+  <data name="Command_AutoMemberUnhold_Success" xml:space="preserve">
+    <value>Auto member hold for user &lt;@{0}&gt; has been removed.</value>
+    <comment>{0} is the target user ID.</comment>
+  </data>
+  <data name="InstarLogoUrl" xml:space="preserve">
+    <value>https://spacegirl.s3.us-east-1.amazonaws.com/instar.png</value>
+  </data>
+  <data name="Embed_Page_Footer" xml:space="preserve">
+    <value>Instar Paging System</value>
+  </data>
+  <data name="Command_Page_Error_NotAuthorized" xml:space="preserve">
+    <value>You are not authorized to use this command.</value>
+  </data>
+  <data name="Command_Page_Error_FullTeamNotAuthorized" xml:space="preserve">
+    <value>You are not authorized to send a page to the entire staff team.</value>
+  </data>
+  <data name="Command_Page_Error_NoAllTeamlead" xml:space="preserve">
+    <value>Failed to send page. The 'All' team does not have a teamleader. If intended to page the owner, please select the Owner as the team.</value>
+  </data>
+  <data name="Command_Page_Error_Unexpected" xml:space="preserve">
+    <value>Failed to process command due to an internal server error.</value>
+  </data>
+  <data name="Command_Page_TestPageMessage" xml:space="preserve">
+    <value>This is a __**TEST**__ page.</value>
+  </data>
+  <data name="Command_ReportUser_ReportSent" xml:space="preserve">
+    <value>Your report has been sent.</value>
+  </data>
+  <data name="Command_ReportUser_ReportExpired" xml:space="preserve">
+    <value>Report expired. Please try again.</value>
+  </data>
+  <data name="Embed_UserReport_Footer" xml:space="preserve">
+    <value>Instar Message Reporting System</value>
+  </data>
+</root>
