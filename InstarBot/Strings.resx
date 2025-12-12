@@ -284,4 +284,71 @@
   <data name="Embed_UserReport_Footer" xml:space="preserve">
     <value>Instar Message Reporting System</value>
   </data>
+  <data name="Birthday_Announcement" xml:space="preserve">
+    <value>:birthday: &lt;@&amp;{0}&gt; {1}!</value>
+    <comment>{0} is the ID of the Happy Birthday role, {1} is the list of recipients.</comment>
+  </data>
+  <data name="JoiningConjunction" xml:space="preserve">
+    <value>and</value>
+  </data>
+  <data name="Embed_BirthdaySystem_Footer" xml:space="preserve">
+    <value>Instar Birthday System</value>
+  </data>
+  <data name="Embed_UnderageUser_WarningTemplate_Member" xml:space="preserve">
+    <value>&lt;@{0}&gt; has set their birthday to &lt;t:{1}:F&gt; which puts their age as {2} years old.</value>
+    <comment>{0} is the user ID, {1} is the user birthday timestamp, and {2} is the user's current age in years.</comment>
+  </data>
+  <data name="Embed_UnderageUser_WarningTemplate_NewMember" xml:space="preserve">
+    <value>&lt;@{0}&gt; has set their birthday to &lt;t:{1}:F&gt; which puts their age as {2} years old.
+
+As the user is a new member, their membership has automatically been withheld pending a staff review.</value>
+    <comment>{0} is the user ID, {1} is the user birthday timestamp, and {2} is the user's current age in years.</comment>
+  </data>
+  <data name="Command_SetBirthday_NotTimeTraveler" xml:space="preserve">
+    <value>You are not a time traveler. Your birthday was not set.</value>
+  </data>
+  <data name="Command_SetBirthday_Error_Unknown" xml:space="preserve">
+    <value>An unknown error has occurred. Instar developers have been notified.</value>
+  </data>
+  <data name="Command_SetBirthday_DaysInMonthOutOfRange" xml:space="preserve">
+    <value>There are only {0} days in {1} {2}. Your birthday was not set.</value>
+    <comment>{0} is the number of days in the month {1} of year {2}.</comment>
+  </data>
+  <data name="Command_SetBirthday_MonthsOutOfRange" xml:space="preserve">
+    <value>There are only 12 months in a year. Your birthday was not set.</value>
+  </data>
+  <data name="Command_SetBirthday_Underage_AMHReason" xml:space="preserve">
+    <value>User entered the birthday &lt;t:{0}:F&gt; which indicates they are under the age of {1}.</value>
+    <comment>{0} is the user birthday timestamp, {1} is the minimum permissible age.</comment>
+  </data>
+  <data name="Command_SetBirthday_Success" xml:space="preserve">
+    <value>Your birthday was set to &lt;t:{0}:F&gt;.</value>
+    <comment>{0} is the user birthday timestamp</comment>
+  </data>
+  <data name="Command_SetBirthday_Error_CouldNotSetBirthday" xml:space="preserve">
+    <value>Your birthday could not be set at this time. Please try again later.</value>
+  </data>
+  <data name="Command_SetBirthday_Error_AlreadySet" xml:space="preserve">
+    <value>You have already set your birthday on this server to &lt;t:{0}:F&gt;. If this birthday is in error, please contact staff to reset it for you.</value>
+    <comment>{0} is the timestamp of the user's birthday.</comment>
+  </data>
+  <data name="Command_ResetBirthday_Error_UserNotFound" xml:space="preserve">
+    <value>Could not reset the birthday of user &lt;@{0}&gt;: user was not found in the database.</value>
+    <comment>{0] is the user ID.</comment>
+  </data>
+  <data name="Command_ResetBirthday_Success" xml:space="preserve">
+    <value>Successfully reset the birthday of &lt;@{0}&gt;. The user has been notified by DM.</value>
+    <comment>{0} is the user ID.</comment>
+  </data>
+  <data name="Command_ResetBirthday_EndUserNotification" xml:space="preserve">
+    <value>Your birthday has been reset. You may now set your birthday again using `/setbirthday` in the server.</value>
+  </data>
+  <data name="Command_ResetBirthday_Error_Unknown" xml:space="preserve">
+    <value>Could not reset the birthday of &lt;@{0}&gt;: an unknown error has occurred. Please try again later.</value>
+    <comment>{0} is the user ID</comment>
+  </data>
+  <data name="Command_ResetBirthday_Error_RemoveBirthdayRole" xml:space="preserve">
+    <value>Successfully reset the birthday of &lt;@{0}&gt;, but the birthday role could not be automatically removed. The user has been notified of the reset by DM.</value>
+    <comment>{0} is the user ID.</comment>
+  </data>
 </root>

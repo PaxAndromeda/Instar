@@ -8,7 +8,8 @@ namespace PaxAndromeda.Instar.ConfigModels;
 public sealed class InstarDynamicConfiguration
 {
     public string BotName { get; set; } = null!;
-    [SnowflakeType(SnowflakeType.Guild)] public Snowflake TargetGuild { get; set; } = null!;
+	[SnowflakeType(SnowflakeType.User)] public Snowflake BotUserID { get; set; } = null!;
+	[SnowflakeType(SnowflakeType.Guild)] public Snowflake TargetGuild { get; set; } = null!;
     [SnowflakeType(SnowflakeType.Channel)] public Snowflake TargetChannel { get; set; } = null!;
     public string Token { get; set; } = null!;
     public string GaiusAPIKey { get; set; } = null!;
@@ -19,8 +20,29 @@ public sealed class InstarDynamicConfiguration
     [SnowflakeType(SnowflakeType.Role)] public Snowflake MemberRoleID { get; set; } = null!;
     public Snowflake[] AuthorizedStaffID { get; set; } = null!;
     public AutoMemberConfig AutoMemberConfig { get; set; } = null!;
+	public BirthdayConfig BirthdayConfig { get; set; } = null!;
     public Team[] Teams { get; set; } = null!;
     public Dictionary<string, PhraseCommand> FunCommands { get; set; } = null!;
+}
+
+[UsedImplicitly]
+public class BirthdayConfig
+{
+	[SnowflakeType(SnowflakeType.Role)]
+	public Snowflake BirthdayRole { get; set; } = null!;
+	[SnowflakeType(SnowflakeType.Channel)]
+	public Snowflake BirthdayAnnounceChannel { get; set; } = null!;
+	public int MinimumPermissibleAge { get; set; }
+	public List<AgeRoleMapping> AgeRoleMap { get; set; } = null!;
+}
+
+[UsedImplicitly]
+public record AgeRoleMapping
+{
+	public int Age { get; set; }
+
+	[SnowflakeType(SnowflakeType.Role)]
+	public Snowflake Role { get; set; } = null!;
 }
 
 [UsedImplicitly]

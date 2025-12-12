@@ -24,14 +24,14 @@ internal sealed class AsyncEvent<T>
 
     public void Add(Func<T, Task> subscriber)
     {
-        Guard.Against.Null(subscriber, nameof(subscriber));
+        Guard.Against.Null(subscriber);
         lock (_subLock)
             _subscriptions = _subscriptions.Add(subscriber);
     }
 
     public void Remove(Func<T, Task> subscriber)
     {
-        Guard.Against.Null(subscriber, nameof(subscriber));
+        Guard.Against.Null(subscriber);
         lock (_subLock)
             _subscriptions = _subscriptions.Remove(subscriber);
     }

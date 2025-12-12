@@ -61,6 +61,15 @@ namespace PaxAndromeda.Instar {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to :birthday: &lt;@&amp;{0}&gt; {1}!.
+        /// </summary>
+        public static string Birthday_Announcement {
+            get {
+                return ResourceManager.GetString("Birthday_Announcement", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Error while attempting to withhold membership for &lt;@{0}&gt;: User is already a member..
         /// </summary>
         public static string Command_AutoMemberHold_Error_AlreadyMember {
@@ -457,6 +466,123 @@ namespace PaxAndromeda.Instar {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Your birthday has been reset. You may now set your birthday again using `/setbirthday` in the server..
+        /// </summary>
+        public static string Command_ResetBirthday_EndUserNotification {
+            get {
+                return ResourceManager.GetString("Command_ResetBirthday_EndUserNotification", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Successfully reset the birthday of &lt;@{0}&gt;, but the birthday role could not be automatically removed. The user has been notified of the reset by DM..
+        /// </summary>
+        public static string Command_ResetBirthday_Error_RemoveBirthdayRole {
+            get {
+                return ResourceManager.GetString("Command_ResetBirthday_Error_RemoveBirthdayRole", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Could not reset the birthday of &lt;@{0}&gt;: an unknown error has occurred. Please try again later..
+        /// </summary>
+        public static string Command_ResetBirthday_Error_Unknown {
+            get {
+                return ResourceManager.GetString("Command_ResetBirthday_Error_Unknown", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Could not reset the birthday of user &lt;@{0}&gt;: user was not found in the database..
+        /// </summary>
+        public static string Command_ResetBirthday_Error_UserNotFound {
+            get {
+                return ResourceManager.GetString("Command_ResetBirthday_Error_UserNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Successfully reset the birthday of &lt;@{0}&gt;. The user has been notified by DM..
+        /// </summary>
+        public static string Command_ResetBirthday_Success {
+            get {
+                return ResourceManager.GetString("Command_ResetBirthday_Success", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to There are only {0} days in {1} {2}. Your birthday was not set..
+        /// </summary>
+        public static string Command_SetBirthday_DaysInMonthOutOfRange {
+            get {
+                return ResourceManager.GetString("Command_SetBirthday_DaysInMonthOutOfRange", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to You have already set your birthday on this server to &lt;t:{0}:F&gt;. If this birthday is in error, please contact staff to reset it for you..
+        /// </summary>
+        public static string Command_SetBirthday_Error_AlreadySet {
+            get {
+                return ResourceManager.GetString("Command_SetBirthday_Error_AlreadySet", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Your birthday could not be set at this time. Please try again later..
+        /// </summary>
+        public static string Command_SetBirthday_Error_CouldNotSetBirthday {
+            get {
+                return ResourceManager.GetString("Command_SetBirthday_Error_CouldNotSetBirthday", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to An unknown error has occurred. Instar developers have been notified..
+        /// </summary>
+        public static string Command_SetBirthday_Error_Unknown {
+            get {
+                return ResourceManager.GetString("Command_SetBirthday_Error_Unknown", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to There are only 12 months in a year. Your birthday was not set..
+        /// </summary>
+        public static string Command_SetBirthday_MonthsOutOfRange {
+            get {
+                return ResourceManager.GetString("Command_SetBirthday_MonthsOutOfRange", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to You are not a time traveler. Your birthday was not set..
+        /// </summary>
+        public static string Command_SetBirthday_NotTimeTraveler {
+            get {
+                return ResourceManager.GetString("Command_SetBirthday_NotTimeTraveler", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Your birthday was set to &lt;t:{0}:F&gt;..
+        /// </summary>
+        public static string Command_SetBirthday_Success {
+            get {
+                return ResourceManager.GetString("Command_SetBirthday_Success", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to User entered the birthday &lt;t:{0}:F&gt; which indicates they are under the age of {1}..
+        /// </summary>
+        public static string Command_SetBirthday_Underage_AMHReason {
+            get {
+                return ResourceManager.GetString("Command_SetBirthday_Underage_AMHReason", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Instar Auto Member System.
         /// </summary>
         public static string Embed_AMS_Footer {
@@ -466,11 +592,40 @@ namespace PaxAndromeda.Instar {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Instar Birthday System.
+        /// </summary>
+        public static string Embed_BirthdaySystem_Footer {
+            get {
+                return ResourceManager.GetString("Embed_BirthdaySystem_Footer", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Instar Paging System.
         /// </summary>
         public static string Embed_Page_Footer {
             get {
                 return ResourceManager.GetString("Embed_Page_Footer", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to &lt;@{0}&gt; has set their birthday to &lt;t:{1}:F&gt; which puts their age as {2} years old..
+        /// </summary>
+        public static string Embed_UnderageUser_WarningTemplate_Member {
+            get {
+                return ResourceManager.GetString("Embed_UnderageUser_WarningTemplate_Member", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to &lt;@{0}&gt; has set their birthday to &lt;t:{1}:F&gt; which puts their age as {2} years old.
+        ///
+        ///As the user is a new member, their membership has automatically been withheld pending a staff review..
+        /// </summary>
+        public static string Embed_UnderageUser_WarningTemplate_NewMember {
+            get {
+                return ResourceManager.GetString("Embed_UnderageUser_WarningTemplate_NewMember", resourceCulture);
             }
         }
         
@@ -489,6 +644,15 @@ namespace PaxAndromeda.Instar {
         public static string InstarLogoUrl {
             get {
                 return ResourceManager.GetString("InstarLogoUrl", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to and.
+        /// </summary>
+        public static string JoiningConjunction {
+            get {
+                return ResourceManager.GetString("JoiningConjunction", resourceCulture);
             }
         }
     }

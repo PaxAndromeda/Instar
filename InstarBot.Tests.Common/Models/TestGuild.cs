@@ -7,11 +7,12 @@ namespace InstarBot.Tests.Models;
 public class TestGuild : IInstarGuild
 {
     public ulong Id { get; init; }
-    public IEnumerable<ITextChannel> TextChannels { get; init; } = null!;
+    public IEnumerable<ITextChannel> TextChannels { get; init; } = [ ];
 
-    public IEnumerable<IRole> Roles { get; init; } = null!;
 
-    public IEnumerable<IGuildUser> Users { get; init; } = null!;
+	public IEnumerable<IRole> Roles { get; init; } = null!;
+
+	public List<IGuildUser> Users { get; init; } = [];
 
     public virtual ITextChannel GetTextChannel(ulong channelId)
     {
@@ -21,5 +22,10 @@ public class TestGuild : IInstarGuild
     public virtual IRole GetRole(Snowflake roleId)
     {
         return Roles.First(n => n.Id.Equals(roleId));
-    }
+	}
+
+	public void AddUser(TestGuildUser user)
+	{
+		Users.Add(user);
+	}
 }

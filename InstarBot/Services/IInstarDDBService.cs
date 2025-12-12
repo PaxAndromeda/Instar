@@ -41,4 +41,18 @@ public interface IInstarDDBService
     /// <param name="data">An instance of <see cref="InstarUserData"/> to save into DynamoDB.</param>
     /// <returns>Nothing.</returns>
     Task CreateUserAsync(InstarUserData data);
+
+	/// <summary>
+	/// Retrieves a list of users whose birthdays match the specified date, allowing for a margin of error defined by the
+	/// fuzziness parameter.
+	/// </summary>
+	/// <remarks>The search includes users whose birthdays are within the specified fuzziness window before or after
+	/// the given date. This method performs the comparison in UTC to ensure consistency across time zones.</remarks>
+	/// <param name="birthdate">The birthdate to search for. Represents the target date to match  against user birthdays.</param>
+	/// <param name="fuzziness">The allowable time range, as a <see cref="TimeSpan"/>, within which user birthdays are considered a match. Must be
+	/// non-negative.</param>
+	/// <returns>A task that represents the asynchronous operation. The task result contains a list of <see
+	/// cref="InstarDatabaseEntry{InstarUserData}"/> objects for users whose birthdays fall within the specified range.
+	/// Returns an empty list if no users are found.</returns>
+	Task<List<InstarDatabaseEntry<InstarUserData>>> GetUsersByBirthday(DateTimeOffset birthdate, TimeSpan fuzziness);
 }

@@ -7,7 +7,6 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.DynamoModels;
-using PaxAndromeda.Instar.Services;
 using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
@@ -57,7 +56,7 @@ public static class CheckEligibilityCommandTests
 			new TestContext
 			{
 				UserID = userId,
-				UserRoles = context.Roles.Select(n => new Snowflake(n)).ToList()
+				UserRoles = context.Roles.Select(n => new Snowflake(n)).ToHashSet()
 			});
 
 		context.DDB = mockDDB;
@@ -181,7 +180,7 @@ public static class CheckEligibilityCommandTests
 	[Theory]
 	[InlineData(MembershipEligibility.MissingRoles)]
 	[InlineData(MembershipEligibility.MissingIntroduction)]
-	[InlineData(MembershipEligibility.TooYoung)]
+	[InlineData(MembershipEligibility.InadequateTenure)]
 	[InlineData(MembershipEligibility.PunishmentReceived)]
 	[InlineData(MembershipEligibility.NotEnoughMessages)]
 	public static async Task CheckEligibilityCommand_WithBadRoles_ShouldEmitValidMessage(MembershipEligibility eligibility)
@@ -191,7 +190,7 @@ public static class CheckEligibilityCommandTests
 		{
 			{ MembershipEligibility.MissingRoles,        Strings.Command_CheckEligibility_MessagesEligibility },
 			{ MembershipEligibility.MissingIntroduction, Strings.Command_CheckEligibility_IntroductionEligibility },
-			{ MembershipEligibility.TooYoung,            Strings.Command_CheckEligibility_JoinAgeEligibility },
+			{ MembershipEligibility.InadequateTenure,            Strings.Command_CheckEligibility_JoinAgeEligibility },
 			{ MembershipEligibility.PunishmentReceived,  Strings.Command_CheckEligibility_ModActionsEligibility },
 			{ MembershipEligibility.NotEnoughMessages,   Strings.Command_CheckEligibility_MessagesEligibility },
 		};
@@ -200,7 +199,7 @@ public static class CheckEligibilityCommandTests
 		{
 			{ MembershipEligibility.MissingRoles,        Strings.Command_CheckEligibility_MissingItem_Role },
 			{ MembershipEligibility.MissingIntroduction, Strings.Command_CheckEligibility_MissingItem_Introduction },
-			{ MembershipEligibility.TooYoung,            Strings.Command_CheckEligibility_MissingItem_TooYoung },
+			{ MembershipEligibility.InadequateTenure,            Strings.Command_CheckEligibility_MissingItem_TooYoung },
 			{ MembershipEligibility.PunishmentReceived,  Strings.Command_CheckEligibility_MissingItem_PunishmentReceived },
 			{ MembershipEligibility.NotEnoughMessages,   Strings.Command_CheckEligibility_MissingItem_Messages },
 		};
@@ -218,7 +217,7 @@ public static class CheckEligibilityCommandTests
 		var ctx = new CheckEligibilityCommandTestContext(
 			false,
 			[ NewMemberRole ], 
-			MembershipEligibility.NotEligible | eligibility);
+			eligibility);
 
 		var mock = await SetupCommandMock(ctx);
 
@@ -253,7 +252,7 @@ public static class CheckEligibilityCommandTests
 	public static async Task CheckOtherEligibility_WithIneligibleMember_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var ctx = new CheckEligibilityCommandTestContext(false, [ NewMemberRole ], MembershipEligibility.NotEligible | MembershipEligibility.MissingRoles);
+		var ctx = new CheckEligibilityCommandTestContext(false, [ NewMemberRole ], MembershipEligibility.MissingRoles);
 		var mock = await SetupCommandMock(ctx);
 
 		ctx.User.Should().NotBeNull();
@@ -274,7 +273,7 @@ public static class CheckEligibilityCommandTests
 	public static async Task CheckOtherEligibility_WithAMHedMember_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var ctx = new CheckEligibilityCommandTestContext(true, [ NewMemberRole ], MembershipEligibility.NotEligible | MembershipEligibility.MissingRoles);
+		var ctx = new CheckEligibilityCommandTestContext(true, [ NewMemberRole ],  MembershipEligibility.MissingRoles);
 		var mock = await SetupCommandMock(ctx);
 
 		ctx.User.Should().NotBeNull();
@@ -295,7 +294,7 @@ public static class CheckEligibilityCommandTests
 	public static async Task CheckOtherEligibility_WithDynamoError_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var ctx = new CheckEligibilityCommandTestContext(false, [ NewMemberRole ], MembershipEligibility.NotEligible | MembershipEligibility.MissingRoles);
+		var ctx = new CheckEligibilityCommandTestContext(false, [ NewMemberRole ], MembershipEligibility.MissingRoles);
 		var mock = await SetupCommandMock(ctx);
 
 		ctx.DDB.Setup(n => n.GetUserAsync(It.IsAny<Snowflake>()))

@@ -6,6 +6,7 @@ using Discord.WebSocket;
 using PaxAndromeda.Instar.Caching;
 using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.DynamoModels;
+using PaxAndromeda.Instar.Gaius;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Modals;
 using Serilog;
@@ -27,6 +28,7 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
     private readonly IGaiusAPIService _gaiusApiService;
     private readonly IInstarDDBService _ddbService;
     private readonly IMetricService _metricService;
+    private readonly TimeProvider _timeProvider;
     private Timer _timer = null!;
 
     /// <summary>
@@ -35,27 +37,27 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
     private Dictionary<ulong, int>? _recentMessages;
 
     public AutoMemberSystem(IDynamicConfigService dynamicConfig, IDiscordService discord, IGaiusAPIService gaiusApiService,
-        IInstarDDBService ddbService, IMetricService metricService)
+        IInstarDDBService ddbService, IMetricService metricService, TimeProvider timeProvider)
     {
         _dynamicConfig = dynamicConfig;
         _discord = discord;
         _gaiusApiService = gaiusApiService;
         _ddbService = ddbService;
         _metricService = metricService;
+        _timeProvider = timeProvider;
 
         discord.UserJoined += HandleUserJoined;
+		discord.UserLeft += HandleUserLeft;
 		discord.UserUpdated += HandleUserUpdated;
         discord.MessageReceived += HandleMessageReceived;
         discord.MessageDeleted += HandleMessageDeleted;
-
-        Task.Run(Initialize).Wait();
     }
 
-    private async Task Initialize()
+    public async Task Initialize()
     {
         var cfg = await _dynamicConfig.GetConfig();
         
-        _earliestJoinTime = DateTime.UtcNow - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumJoinAge);
+        _earliestJoinTime = _timeProvider.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumJoinAge);
         
         await PreloadMessageCache(cfg);
         await PreloadIntroductionPosters(cfg);
@@ -66,18 +68,49 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
         StartTimer();
     }
 
+	/// <summary>
+	/// Filters warnings and caselogs to only focus on the ones we care about. For example, we don't
+	/// want to withhold membership from someone who was kicked for having a too new Discord account.
+	/// </summary>
+	/// <param name="warnings">A collection of warnings retrieved from the Gaius API.</param>
+	/// <param name="caselogs">A collection of caselogs retrieved from the Gaius API.</param>
+	/// <returns>A tuple containing the filtered warnings and caselogs, respectively.</returns>
+	/// <exception cref="ArgumentNullException">If <paramref name="warnings"/> or <paramref name="caselogs"/> is null.</exception>
+	private static (IEnumerable<Warning>, IEnumerable<Caselog>) FilterPunishments(IEnumerable<Warning> warnings, IEnumerable<Caselog> caselogs)
+	{
+		if (warnings is null)
+			throw new ArgumentNullException(nameof(warnings));
+		if (caselogs is null)
+			throw new ArgumentNullException(nameof(caselogs));
+
+		var filteredCaselogs = caselogs.Where(n => n is not { Type: CaselogType.Kick, Reason: "Join age punishment" });
+
+		return (warnings, filteredCaselogs);
+	}
+
     private async Task UpdateGaiusPunishments()
     {
         // Normally we'd go for 1 hour here, but we can run into
         // a situation where someone was warned exactly 1.000000001
         // hours ago, thus would be missed.  To fix this, we'll
         // bias for an hour and a half ago.
-        var afterTime = DateTime.UtcNow - TimeSpan.FromHours(1.5);
-        
-        foreach (var warning in await _gaiusApiService.GetWarningsAfter(afterTime))
-            _punishedUsers.TryAdd(warning.UserID.ID, true);
-        foreach (var caselog in await _gaiusApiService.GetCaselogsAfter(afterTime))
-            _punishedUsers.TryAdd(caselog.UserID.ID, true);
+        var afterTime = _timeProvider.GetUtcNow().UtcDateTime - TimeSpan.FromHours(1.5);
+
+		try
+		{
+			var (warnings, caselogs) = FilterPunishments(
+				await _gaiusApiService.GetWarningsAfter(afterTime),
+				await _gaiusApiService.GetCaselogsAfter(afterTime));
+
+			foreach (var warning in warnings)
+				_punishedUsers.TryAdd(warning.UserID.ID, true);
+
+			foreach (var caselog in caselogs)
+				_punishedUsers.TryAdd(caselog.UserID.ID, true);
+		} catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to update Gaius punishments.");
+		}
     }
 
     private async Task HandleMessageDeleted(Snowflake arg)
@@ -148,8 +181,13 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
         }
         
         await _metricService.Emit(Metric.Discord_UsersJoined, 1);
-    }
-	
+	}
+	private async Task HandleUserLeft(IUser arg)
+	{
+		// TODO: Maybe handle something here later
+		await _metricService.Emit(Metric.Discord_UsersLeft, 1);
+	}
+
 	private async Task HandleUserUpdated(UserUpdatedEventArgs arg)
 	{
 		if (!arg.HasUpdated)
@@ -183,7 +221,7 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
 
 		if (arg.Before.Nickname != arg.After.Nickname)
 		{
-			user.Data.Nicknames?.Add(new InstarUserDataHistoricalEntry<string>(DateTime.UtcNow, arg.After.Nickname));
+			user.Data.Nicknames?.Add(new InstarUserDataHistoricalEntry<string>(_timeProvider.GetUtcNow().UtcDateTime, arg.After.Nickname));
 			changed = true;
 		}
 
@@ -196,19 +234,22 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
 
 	private void StartTimer()
     {
-        // Since we can start the bot in the middle of an hour,
-        // first we must determine the time until the next top
-        // of hour.
-        var nextHour = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day,
-            DateTime.UtcNow.Hour, 0, 0).AddHours(1);
-        var millisecondsRemaining = (nextHour - DateTime.UtcNow).TotalMilliseconds;
+		// Since we can start the bot in the middle of an hour,
+		// first we must determine the time until the next top
+		// of hour.
+		var currentTime = _timeProvider.GetUtcNow().UtcDateTime;
+        var nextHour = new DateTime(currentTime.Year, currentTime.Month, currentTime.Day,
+			currentTime.Hour, 0, 0).AddHours(1);
+        var millisecondsRemaining = (nextHour - currentTime).TotalMilliseconds;
         
         // Start the timer.  In elapsed step, we reset the
         // duration to exactly 1 hour.
         _timer = new Timer(millisecondsRemaining);
         _timer.Elapsed += TimerElapsed;
         _timer.Start();
-    }
+
+		Log.Information("Auto member system timer started, first run in {SecondsRemaining} seconds.", millisecondsRemaining / 1000);
+	}
 
     private async void TimerElapsed(object? sender, ElapsedEventArgs e)
     {
@@ -241,7 +282,7 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
                 await UpdateGaiusPunishments();
             }
 
-            _earliestJoinTime = DateTime.UtcNow - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumJoinAge);
+            _earliestJoinTime = _timeProvider.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumJoinAge);
             _recentMessages = GetMessagesSent();
             
             Log.Verbose("Earliest join time: {EarliestJoinTime}", _earliestJoinTime);
@@ -382,7 +423,7 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
             eligibility |= MembershipEligibility.AlreadyMember;
 
         if (user.JoinedAt > _earliestJoinTime)
-            eligibility |= MembershipEligibility.TooYoung;
+            eligibility |= MembershipEligibility.InadequateTenure;
 
         if (!CheckUserRequiredRoles(cfg, user))
             eligibility |= MembershipEligibility.MissingRoles;
@@ -399,15 +440,12 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
 		if (user.RoleIds.Contains(cfg.AutoMemberConfig.HoldRole))
 			eligibility |= MembershipEligibility.AutoMemberHold;
 
+		// If the eligibility is no longer exactly Eligible,
+		// then we can unset that flag.
 		if (eligibility != MembershipEligibility.Eligible)
-		{
-			// Unset Eligible flag, add NotEligible flag.
-			// OPTIMIZE: Do we need the NotEligible flag at all?
 			eligibility &= ~MembershipEligibility.Eligible;
-			eligibility |= MembershipEligibility.NotEligible;
-		}
         
-        Log.Verbose("User {User} ({UserID}) membership eligibility: {Eligibility}", user.Username, user.Id, eligibility);
+		Log.Verbose("User {User} ({UserID}) membership eligibility: {Eligibility}", user.Username, user.Id, eligibility);
         return eligibility;
     }
 
@@ -442,17 +480,29 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
     
     private async Task PreloadGaiusPunishments()
     {
-        foreach (var warning in await _gaiusApiService.GetAllWarnings())
-            _punishedUsers.TryAdd(warning.UserID.ID, true);
-        foreach (var caselog in await _gaiusApiService.GetAllCaselogs())
-            _punishedUsers.TryAdd(caselog.UserID.ID, true);
+		try
+		{
+			var (warnings, caselogs) = FilterPunishments(
+				await _gaiusApiService.GetAllWarnings(),
+				await _gaiusApiService.GetAllCaselogs());
+
+			foreach (var warning in warnings)
+				_punishedUsers.TryAdd(warning.UserID.ID, true);
+			foreach (var caselog in caselogs)
+				_punishedUsers.TryAdd(caselog.UserID.ID, true);
+		}
+		catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to preload Gaius punishments.");
+			throw;
+		}
     }
 
     private async Task PreloadMessageCache(InstarDynamicConfiguration cfg)
     {
         Log.Information("Preloading message cache...");
         var guild = _discord.GetGuild();
-        var earliestMessageTime = DateTime.UtcNow - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumMessageTime);
+        var earliestMessageTime = _timeProvider.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumMessageTime);
         var messages = _discord.GetMessages(guild, earliestMessageTime);
 
         await foreach (var message in messages)

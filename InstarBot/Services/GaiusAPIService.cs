@@ -1,10 +1,12 @@
+using System.Diagnostics;
 using Newtonsoft.Json;
 using PaxAndromeda.Instar.Gaius;
 using System.Text;
+using PaxAndromeda.Instar.Metrics;
 
 namespace PaxAndromeda.Instar.Services;
 
-public sealed class GaiusAPIService(IDynamicConfigService config) : IGaiusAPIService
+public sealed class GaiusAPIService(IDynamicConfigService config, IMetricService metrics) : IGaiusAPIService
 {
     // Used in release mode
     // ReSharper disable once NotAccessedField.Local
@@ -135,8 +137,14 @@ public sealed class GaiusAPIService(IDynamicConfigService config) : IGaiusAPISer
     private async Task<string> Get(string url)
     {
         var hrm = CreateRequest(url);
+		await metrics.Emit(Metric.Gaius_APICalls, 1);
+
+		var stopwatch = Stopwatch.StartNew();
         var response = await _client.SendAsync(hrm);
-        
+		stopwatch.Stop();
+
+		await metrics.Emit(Metric.Gaius_APILatency, stopwatch.Elapsed.TotalMilliseconds);
+
         return await response.Content.ReadAsStringAsync();
     }
 

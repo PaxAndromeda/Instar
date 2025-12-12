@@ -12,7 +12,7 @@ public sealed class TestContext
     public const ulong ChannelID = 1420070400200;
     public const ulong GuildID = 1420070400300;
 
-    public List<Snowflake> UserRoles { get; init; } = [];
+    public HashSet<Snowflake> UserRoles { get; init; } = [];
 
     public Action<Embed> EmbedCallback { get; init; } = _ => { };
 
@@ -20,13 +20,16 @@ public sealed class TestContext
 
     public List<IGuildUser> GuildUsers { get; } = [];
 
-    public Dictionary<Snowflake, TestChannel> Channels { get; } = [];
+    public Dictionary<Snowflake, ITextChannel> Channels { get; } = [];
     public Dictionary<Snowflake, TestRole> Roles { get; } = [];
 
     public Dictionary<Snowflake, List<Warning>> Warnings { get; } = [];
     public Dictionary<Snowflake, List<Caselog>> Caselogs { get; } = [];
 
-    public bool InhibitGaius { get; set; }
+	public Dictionary<Snowflake, List<TestRole>> UserRolesMap { get; } = [];
+
+	public bool InhibitGaius { get; set; }
+    public Mock<IDMChannel> DMChannelMock { get ; set ; }
 
     public void AddWarning(Snowflake userId, Warning warning)
     {
@@ -50,7 +53,7 @@ public sealed class TestContext
         Channels.Add(channelId, new TestChannel(channelId));
     }
 
-    public TestChannel GetChannel(Snowflake channelId)
+    public ITextChannel GetChannel(Snowflake channelId)
     {
         return Channels[channelId];
     }

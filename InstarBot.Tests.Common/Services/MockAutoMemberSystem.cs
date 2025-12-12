@@ -16,4 +16,9 @@ public class MockAutoMemberSystem : IAutoMemberSystem
 	{
 		throw new NotImplementedException();
 	}
+
+	public Task Initialize()
+	{
+		throw new NotImplementedException();
+	}
 }

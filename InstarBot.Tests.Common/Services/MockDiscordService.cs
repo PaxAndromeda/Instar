@@ -9,8 +9,9 @@ namespace InstarBot.Tests.Services;
 
 public sealed class MockDiscordService : IDiscordService
 {
-    private readonly IInstarGuild _guild;
-    private readonly AsyncEvent<IGuildUser> _userJoinedEvent = new();
+    private IInstarGuild _guild;
+	private readonly AsyncEvent<IGuildUser> _userJoinedEvent = new();
+	private readonly AsyncEvent<IUser> _userLeftEvent = new();
 	private readonly AsyncEvent<UserUpdatedEventArgs> _userUpdatedEvent = new();
 	private readonly AsyncEvent<IMessage> _messageReceivedEvent = new();
 	private readonly AsyncEvent<Snowflake> _messageDeletedEvent = new();
@@ -19,6 +20,12 @@ public sealed class MockDiscordService : IDiscordService
     {
         add => _userJoinedEvent.Add(value);
         remove => _userJoinedEvent.Remove(value);
+	}
+
+	public event Func<IUser, Task> UserLeft
+	{
+		add => _userLeftEvent.Add(value);
+		remove => _userLeftEvent.Remove(value);
 	}
 
 	public event Func<UserUpdatedEventArgs, Task> UserUpdated
@@ -44,6 +51,12 @@ public sealed class MockDiscordService : IDiscordService
         _guild = guild;
     }
 
+    public IInstarGuild Guild
+    {
+	    get => _guild;
+		set => _guild = value;
+	}
+
     public Task Start(IServiceProvider provider)
     {
         return Task.CompletedTask;
@@ -56,7 +69,7 @@ public sealed class MockDiscordService : IDiscordService
 
     public Task<IEnumerable<IGuildUser>> GetAllUsers()
     {
-        return Task.FromResult(((TestGuild)_guild).Users);
+        return Task.FromResult(((TestGuild)_guild).Users.AsEnumerable());
     }
 
     public Task<IChannel> GetChannel(Snowflake channelId)
@@ -70,6 +83,21 @@ public sealed class MockDiscordService : IDiscordService
         await foreach (var messageList in channel.GetMessagesAsync())
         foreach (var message in messageList)
             yield return message;
+	}
+
+    public IGuildUser? GetUser(Snowflake snowflake)
+    {
+		return ((TestGuild) _guild).Users.FirstOrDefault(n => n.Id.Equals(snowflake.ID));
+    }
+
+    public IEnumerable<IGuildUser> GetAllUsersWithRole(Snowflake roleId)
+	{
+		return ((TestGuild) _guild).Users.Where(n => n.RoleIds.Contains(roleId.ID));
+	}
+
+	public Task SyncUsers()
+	{
+		return Task.CompletedTask;
 	}
 
 	public async Task TriggerUserJoined(IGuildUser user)
@@ -87,4 +115,10 @@ public sealed class MockDiscordService : IDiscordService
     {
         await _messageReceivedEvent.Invoke(message);
     }
+
+	public void AddUser(TestGuildUser user)
+	{
+		var guild = _guild as TestGuild;
+		guild?.AddUser(user);
+	}
 }

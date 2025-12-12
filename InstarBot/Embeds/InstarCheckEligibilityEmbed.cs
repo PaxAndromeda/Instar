@@ -12,7 +12,7 @@ public class InstarCheckEligibilityEmbed(IGuildUser user, MembershipEligibility 
 		// We only have to focus on the description, author and fields here
 
 		var fields = new List<EmbedFieldBuilder>();
-		if (eligibility.HasFlag(MembershipEligibility.NotEligible))
+		if (!eligibility.HasFlag(MembershipEligibility.Eligible))
 		{
 			fields.Add(new EmbedFieldBuilder()
 				.WithName("Missing Items")
@@ -43,7 +43,7 @@ public class InstarCheckEligibilityEmbed(IGuildUser user, MembershipEligibility 
 
 		eligibilityBuilder.AppendLine(BuildEligibilityComponent(Strings.Command_CheckEligibility_RolesEligibility, !eligibility.HasFlag(MembershipEligibility.MissingRoles)));
 		eligibilityBuilder.AppendLine(BuildEligibilityComponent(Strings.Command_CheckEligibility_IntroductionEligibility, !eligibility.HasFlag(MembershipEligibility.MissingIntroduction)));
-		eligibilityBuilder.AppendLine(BuildEligibilityComponent(Strings.Command_CheckEligibility_JoinAgeEligibility, !eligibility.HasFlag(MembershipEligibility.TooYoung)));
+		eligibilityBuilder.AppendLine(BuildEligibilityComponent(Strings.Command_CheckEligibility_JoinAgeEligibility, !eligibility.HasFlag(MembershipEligibility.InadequateTenure)));
 		eligibilityBuilder.AppendLine(BuildEligibilityComponent(Strings.Command_CheckEligibility_ModActionsEligibility, !eligibility.HasFlag(MembershipEligibility.PunishmentReceived)));
 		eligibilityBuilder.AppendLine(BuildEligibilityComponent(Strings.Command_CheckEligibility_MessagesEligibility, !eligibility.HasFlag(MembershipEligibility.NotEnoughMessages)));
 
@@ -81,7 +81,7 @@ public class InstarCheckEligibilityEmbed(IGuildUser user, MembershipEligibility 
 		if (eligibility.HasFlag(MembershipEligibility.MissingIntroduction))
 			missingItems.Add(string.Format(Strings.Command_CheckEligibility_MissingItem_Introduction, Snowflake.GetMention(() => config.AutoMemberConfig.IntroductionChannel)));
 		
-		if (eligibility.HasFlag(MembershipEligibility.TooYoung))
+		if (eligibility.HasFlag(MembershipEligibility.InadequateTenure))
 			missingItems.Add(string.Format(Strings.Command_CheckEligibility_MissingItem_TooYoung, config.AutoMemberConfig.MinimumJoinAge / 3600));
 
 		if (eligibility.HasFlag(MembershipEligibility.PunishmentReceived))
