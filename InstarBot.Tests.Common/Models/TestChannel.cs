@@ -239,7 +239,7 @@ public sealed class TestChannel(Snowflake id) : ITextChannel
 
     public ChannelType ChannelType => throw new NotImplementedException();
 
-    private readonly List<TestMessage> _messages = [];
+    private readonly List<IMessage> _messages = [];
 
     public void AddMessage(IGuildUser user, string message)
     {
@@ -248,7 +248,10 @@ public sealed class TestChannel(Snowflake id) : ITextChannel
 
     public Task<IUserMessage> SendMessageAsync(string text = null, bool isTTS = false, Embed embed = null, RequestOptions options = null, AllowedMentions allowedMentions = null, MessageReference messageReference = null, MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null, MessageFlags flags = MessageFlags.None, PollProperties poll = null)
     {
-        throw new NotImplementedException();
+		var msg = new TestMessage(text, isTTS, embed, options, allowedMentions, messageReference, components, stickers, embeds, flags, poll);
+		_messages.Add(msg);
+
+		return Task.FromResult(msg as IUserMessage);
     }
 
     public Task<IUserMessage> SendFileAsync(string filePath, string text = null, bool isTTS = false, Embed embed = null, RequestOptions options = null, bool isSpoiler = false, AllowedMentions allowedMentions = null, MessageReference messageReference = null, MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null, MessageFlags flags = MessageFlags.None, PollProperties poll = null)

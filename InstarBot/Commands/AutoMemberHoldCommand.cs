@@ -11,7 +11,7 @@ using Serilog;
 namespace PaxAndromeda.Instar.Commands;
 
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigService dynamicConfigService, IMetricService metricService) : BaseCommand
+public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigService dynamicConfigService, IMetricService metricService, TimeProvider timeProvider) : BaseCommand
 {
 	[UsedImplicitly]
 	[SlashCommand("amh", "Withhold automatic membership grants to a user.")]
@@ -26,7 +26,7 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 		Guard.Against.Null(Context.User);
 		Guard.Against.Null(user);
 
-		var date = DateTime.UtcNow;
+		var date = timeProvider.GetUtcNow().UtcDateTime;
 		Snowflake modId = Context.User.Id;
 
 		try

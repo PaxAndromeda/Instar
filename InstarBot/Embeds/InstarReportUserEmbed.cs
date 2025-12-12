@@ -1,6 +1,5 @@
 ﻿using Discord;
 using PaxAndromeda.Instar.Modals;
-using System;
 
 namespace PaxAndromeda.Instar.Embeds;
 

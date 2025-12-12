@@ -2,7 +2,6 @@
 using InstarBot.Tests.Models;
 using InstarBot.Tests.Services;
 using Moq;
-using Moq.Protected;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using Xunit;

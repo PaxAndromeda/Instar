@@ -5,19 +5,32 @@ using Amazon.DynamoDBv2.DocumentModel;
 using Discord;
 using JetBrains.Annotations;
 
+
+// Non-nullable field must contain a non-null value when exiting constructor.
+// Since this is a DTO type, we can safely ignore this warning.
+#pragma warning disable CS8618
+
 namespace PaxAndromeda.Instar.DynamoModels;
 
-[DynamoDBTable("TestInstarData")]
+[DynamoDBTable("InstarUsers")]
 [SuppressMessage("ReSharper", "PropertyCanBeMadeInitOnly.Global")]
 public class InstarUserData
 {
-    [DynamoDBHashKey("user_id", Converter = typeof(InstarSnowflakePropertyConverter))]
+	[DynamoDBHashKey("guild_id", Converter = typeof(InstarSnowflakePropertyConverter))]
+	[DynamoDBGlobalSecondaryIndexHashKey("birthdate-gsi", AttributeName = "guild_id")]
+	public Snowflake? GuildID { get; set; }
+
+	[DynamoDBRangeKey("user_id", Converter = typeof(InstarSnowflakePropertyConverter))]
     public Snowflake? UserID { get; set; }
-        
-    [DynamoDBProperty("birthday")]
-    public DateTime? Birthday { get; set; }
-        
-    [DynamoDBProperty("joined")]
+
+	[DynamoDBProperty("birthday", Converter = typeof(InstarBirthdatePropertyConverter))]
+	public Birthday? Birthday { get; set; }
+
+	[DynamoDBGlobalSecondaryIndexRangeKey("birthdate-gsi", AttributeName = "birthdate")]
+	[DynamoDBProperty("birthdate")]
+	public string? Birthdate { get; set; }
+
+	[DynamoDBProperty("joined")]
     public DateTime? Joined { get; set; }
         
     [DynamoDBProperty("position", Converter = typeof(InstarEnumPropertyConverter<InstarUserPosition>))]
@@ -49,7 +62,9 @@ public class InstarUserData
         get => Usernames?.LastOrDefault()?.Data ?? "<unknown>";
         set
         {
-            var time = DateTime.UtcNow;
+			// We can't pass along a TimeProvider, so we'll
+			// need to keep DateTime.UtcNow here.
+			var time = DateTime.UtcNow;
             if (Usernames is null)
             {
                 Usernames = [new InstarUserDataHistoricalEntry<string>(time, value)];
@@ -68,6 +83,7 @@ public class InstarUserData
     {
         return new InstarUserData
         {
+			GuildID = user.GuildId,
             UserID = user.Id,
             Birthday = null,
             Joined = user.JoinedAt?.UtcDateTime,
@@ -264,4 +280,26 @@ public class InstarSnowflakePropertyConverter : IPropertyConverter
         
         return new Snowflake(id);
     }
+}
+
+public class InstarBirthdatePropertyConverter : IPropertyConverter
+{
+	public DynamoDBEntry ToEntry(object value)
+	{
+		return value switch
+		{
+			DateTimeOffset dto => dto.ToString("o"),
+			Birthday birthday => birthday.Birthdate.ToString("o"),
+			_ => throw new InvalidOperationException("Invalid type for Birthdate conversion.")
+		};
+	}
+
+	public object FromEntry(DynamoDBEntry entry)
+	{
+		var sEntry = entry.AsString();
+		if (sEntry is null || string.IsNullOrWhiteSpace(entry.AsString()) || !DateTimeOffset.TryParse(sEntry, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dto))
+			return new DateTimeOffset();
+
+		return new Birthday(dto, TimeProvider.System);
+	}
 }

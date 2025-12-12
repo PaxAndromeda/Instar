@@ -23,6 +23,16 @@ public static class TestUtilities
     private static IConfiguration? _config;
     private static IDynamicConfigService? _dynamicConfig;
 
+    public static ulong GuildID
+    {
+	    get
+	    {
+			var cfg = GetTestConfiguration();
+
+			return ulong.Parse(cfg.GetValue<string>("TargetGuild") ?? throw new ConfigurationException("Expected TargetGuild to be set"));
+		}
+    }
+
     private static IConfiguration GetTestConfiguration()
     {
         if (_config is not null)
@@ -127,7 +137,7 @@ public static class TestUtilities
 	}
 
 	public static void VerifyChannelMessage<T>(Mock<T> channel, string format, bool ephemeral = false, bool partial = false)
-		where T : class, ITextChannel
+		where T : class, IMessageChannel
 	{
 		channel.Verify(c => c.SendMessageAsync(
 				It.Is<string>(s => MatchesFormat(s, format, partial)),
@@ -242,25 +252,45 @@ public static class TestUtilities
         return guildMock;
     }
 
-    public static Mock<T> SetupUserMock<T>(ulong userId)
-        where T : class, IUser
-    {
-        var userMock = new Mock<T>();
-        userMock.Setup(n => n.Id).Returns(userId);
+	public static Mock<T> SetupUserMock<T>(ulong userId)
+		where T : class, IUser
+	{
+		var userMock = new Mock<T>();
+		userMock.Setup(n => n.Id).Returns(userId);
 
-        return userMock;
-    }
+		return userMock;
+	}
 
-    private static Mock<T> SetupUserMock<T>(TestContext? context)
-        where T : class, IUser
-    {
-        var userMock = SetupUserMock<T>(context!.UserID);
+	private static Mock<T> SetupUserMock<T>(TestContext? context)
+		where T : class, IUser
+	{
+		var userMock = SetupUserMock<T>(context!.UserID);
 
-        if (typeof(T) == typeof(IGuildUser))
-            userMock.As<IGuildUser>().Setup(n => n.RoleIds).Returns(context.UserRoles.Select(n => n.ID).ToList);
+		var dmChannelMock = new Mock<IDMChannel>();
 
-        return userMock;
-    }
+		context.DMChannelMock = dmChannelMock;
+		userMock.Setup(n => n.CreateDMChannelAsync(It.IsAny<RequestOptions>()))
+			.ReturnsAsync(dmChannelMock.Object);
+
+		if (typeof(T) != typeof(IGuildUser)) return userMock;
+
+		userMock.As<IGuildUser>().Setup(n => n.RoleIds).Returns(context.UserRoles.Select(n => n.ID).ToList);
+
+		userMock.As<IGuildUser>().Setup(n => n.AddRoleAsync(It.IsAny<ulong>(), It.IsAny<RequestOptions>()))
+			.Callback((ulong roleId, RequestOptions _) =>
+			{
+				context.UserRoles.Add(roleId);
+			})
+			.Returns(Task.CompletedTask);
+
+		userMock.As<IGuildUser>().Setup(n => n.RemoveRoleAsync(It.IsAny<ulong>(), It.IsAny<RequestOptions>()))
+			.Callback((ulong roleId, RequestOptions _) =>
+			{
+				context.UserRoles.Remove(roleId);
+			}).Returns(Task.CompletedTask);
+
+		return userMock;
+	}
 
     public static Mock<T> SetupChannelMock<T>(ulong channelId)
         where T : class, IChannel

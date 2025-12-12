@@ -27,6 +27,8 @@ public static class AutoMemberSystemCommandTests
 		var mockDDB = new MockInstarDDBService();
 		var mockMetrics = new MockMetricService();
 
+		
+
 		var user = new TestGuildUser
 		{
 			Id = userID,
@@ -60,7 +62,7 @@ public static class AutoMemberSystemCommandTests
 		}
 
 		var commandMock = TestUtilities.SetupCommandMock(
-			() => new AutoMemberHoldCommand(mockDDB, TestUtilities.GetDynamicConfiguration(), mockMetrics),
+			() => new AutoMemberHoldCommand(mockDDB, TestUtilities.GetDynamicConfiguration(), mockMetrics, TimeProvider.System),
 			new TestContext
 			{
 				UserID = modID

@@ -44,6 +44,15 @@ public class MockInstarDDBService : IInstarDDBService
 
     public void Register(InstarUserData data)
     {
+		// Quick check to make sure we're not overriding an existing exception
+		try
+		{
+			_internalMock.Object.GetUserAsync(Snowflake.Generate());
+		} catch
+		{
+			return;
+		}
+
 		_internalMock
 				.Setup(n => n.GetUserAsync(data.UserID!))
 				.ReturnsAsync(new InstarDatabaseEntry<InstarUserData>(_ddbContextMock.Object, data));
@@ -73,7 +82,6 @@ public class MockInstarDDBService : IInstarDDBService
 		if (result is not null)
 			return result;
 
-		// Gotta set up the mock
 		await CreateUserAsync(InstarUserData.CreateFrom(user));
 		result = await _internalMock.Object.GetUserAsync(user.Id);
 
@@ -108,7 +116,14 @@ public class MockInstarDDBService : IInstarDDBService
 		return Task.CompletedTask;
 	}
 
-	/// <summary>
+    public async Task<List<InstarDatabaseEntry<InstarUserData>>> GetUsersByBirthday(DateTimeOffset birthdate, TimeSpan fuzziness)
+    {
+		var result = await _internalMock.Object.GetUsersByBirthday(birthdate, fuzziness);
+
+		return result;
+	}
+
+    /// <summary>
 	/// Configures a setup for the specified expression on the mocked <see cref="IInstarDDBService"/> interface, allowing
 	/// control over the behavior of the mock for the given member.
 	/// </summary>

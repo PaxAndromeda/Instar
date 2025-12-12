@@ -22,7 +22,8 @@ public interface IDynamicConfigService
 
 public sealed class AWSDynamicConfigService : IDynamicConfigService
 {
-    private readonly AmazonAppConfigDataClient _appConfigDataClient;
+	private readonly TimeProvider _timeProvider;
+	private readonly AmazonAppConfigDataClient _appConfigDataClient;
     private readonly AmazonSimpleSystemsManagementClient _ssmClient;
     private string _configData = null!;
     private string _nextToken = null!;
@@ -34,9 +35,10 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
     private readonly string _environment;
     private readonly string _configProfile;
 
-    public AWSDynamicConfigService(IConfiguration config)
+    public AWSDynamicConfigService(IConfiguration config, TimeProvider timeProvider)
     {
-        Guard.Against.Null(config);
+	    _timeProvider = timeProvider;
+	    Guard.Against.Null(config);
 
         var awsSection = config.GetSection("AWS");
         var appConfigSection = awsSection.GetSection("AppConfig");
@@ -64,7 +66,7 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
         try
         {
             await _pollSemaphore.WaitAsync();
-            if (DateTime.UtcNow > _nextPollTime)
+            if (_timeProvider.GetUtcNow().UtcDateTime > _nextPollTime)
                 await Poll(false);
 
             return _current;
@@ -111,7 +113,7 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
             });
 
             _nextToken = result.NextPollConfigurationToken;
-            _nextPollTime = DateTime.UtcNow + TimeSpan.FromSeconds((double)(result.NextPollIntervalInSeconds ?? 60));
+            _nextPollTime = _timeProvider.GetUtcNow().UtcDateTime + TimeSpan.FromSeconds((double)(result.NextPollIntervalInSeconds ?? 60));
             
             // Per the documentation, if VersionLabel is empty, then the client
             // has the most up-to-date configuration already stored.  We can stop

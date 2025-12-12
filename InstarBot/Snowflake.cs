@@ -14,10 +14,11 @@ namespace PaxAndromeda.Instar;
 /// </summary>
 /// <remarks>
 ///     Snowflakes are encoded in the following way:
-///
+/// <code>
 ///     Timestamp                                  Wrkr  Prcs  Increment
 ///     111111111111111111111111111111111111111111 11111 11111 111111111111
 ///     64                                         22    17    12          0
+/// </code>
 ///
 ///     Timestamp is the milliseconds since Discord Epoch, the first second of 2015, or 1420070400000
 ///     Worker ID is the internal worker that generated the ID

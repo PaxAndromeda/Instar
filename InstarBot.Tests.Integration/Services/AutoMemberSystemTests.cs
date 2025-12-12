@@ -9,7 +9,7 @@ using PaxAndromeda.Instar.Modals;
 using PaxAndromeda.Instar.Services;
 using Xunit;
 
-namespace InstarBot.Tests.Integration.Interactions;
+namespace InstarBot.Tests.Integration.Services;
 
 public static class AutoMemberSystemTests
 {
@@ -20,7 +20,7 @@ public static class AutoMemberSystemTests
     private static readonly Snowflake SheHer = new(796578609535647765);
     private static readonly Snowflake AutoMemberHold = new(966434762032054282);
 
-    private static AutoMemberSystem SetupTest(AutoMemberSystemContext scenarioContext)
+    private static async Task<AutoMemberSystem> SetupTest(AutoMemberSystemContext scenarioContext)
     {
         var testContext = scenarioContext.TestContext;
 
@@ -65,15 +65,16 @@ public static class AutoMemberSystemTests
 
         testContext.AddChannel(genericChannel);
         if (postedIntro)
-            testContext.GetChannel(amsConfig.IntroductionChannel).AddMessage(user, "Some text");
+            ((TestChannel) testContext.GetChannel(amsConfig.IntroductionChannel)).AddMessage(user, "Some text");
 
         for (var i = 0; i < messagesLast24Hours; i++)
-            testContext.GetChannel(genericChannel).AddMessage(user, "Some text");
+            ((TestChannel)testContext.GetChannel(genericChannel)).AddMessage(user, "Some text");
 
 
-        var ams = new AutoMemberSystem(config, discordService, gaiusApiService, ddbService, new MockMetricService());
+        var ams = new AutoMemberSystem(config, discordService, gaiusApiService, ddbService, new MockMetricService(), TimeProvider.System);
+		await ams.Initialize();
 
-        scenarioContext.User = user;
+		scenarioContext.User = user;
 		scenarioContext.DynamoService = ddbService;
 
         return ams;
@@ -91,9 +92,9 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
-        // Act
+		// Act
         await ams.RunAsync();
 
         // Assert
@@ -112,7 +113,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -133,7 +134,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -153,7 +154,7 @@ public static class AutoMemberSystemTests
             .WithMessages(10)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -173,7 +174,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -192,7 +193,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -212,7 +213,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -232,7 +233,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -252,7 +253,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -273,7 +274,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -282,28 +283,49 @@ public static class AutoMemberSystemTests
         context.AssertNotMember();
     }
 
-    [Fact(DisplayName = "A user with a caselog should not be granted membership")]
-    public static async Task AutoMemberSystem_UserWithGaiusCaselog_ShouldNotBeGrantedMembership()
-    {
-        // Arrange
-        var context = await AutoMemberSystemContext.Builder()
-            .Joined(TimeSpan.FromHours(36))
-            .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
-            .HasPostedIntroduction()
-            .HasBeenPunished()
-            .WithMessages(100)
-            .Build();
+	[Fact(DisplayName = "A user with a caselog should not be granted membership")]
+	public static async Task AutoMemberSystem_UserWithGaiusCaselog_ShouldNotBeGrantedMembership()
+	{
+		// Arrange
+		var context = await AutoMemberSystemContext.Builder()
+			.Joined(TimeSpan.FromHours(36))
+			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
+			.HasPostedIntroduction()
+			.HasBeenPunished()
+			.WithMessages(100)
+			.Build();
 
-        var ams = SetupTest(context);
+		var ams = await SetupTest(context);
 
-        // Act
-        await ams.RunAsync();
+		// Act
+		await ams.RunAsync();
 
-        // Assert
-        context.AssertNotMember();
-    }
+		// Assert
+		context.AssertNotMember();
+	}
 
-    [Fact(DisplayName = "A user should be granted membership if Gaius is unavailable")]
+	[Fact(DisplayName = "A user with a join age auto kick should be granted membership")]
+	public static async Task AutoMemberSystem_UserWithJoinAgeKick_ShouldBeGrantedMembership()
+	{
+		// Arrange
+		var context = await AutoMemberSystemContext.Builder()
+			.Joined(TimeSpan.FromHours(36))
+			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
+			.HasPostedIntroduction()
+			.HasBeenPunished(true)
+			.WithMessages(100)
+			.Build();
+
+		var ams = await SetupTest(context);
+
+		// Act
+		await ams.RunAsync();
+
+		// Assert
+		context.AssertMember();
+	}
+
+	[Fact(DisplayName = "A user should be granted membership if Gaius is unavailable")]
     public static async Task AutoMemberSystem_GaiusIsUnavailable_ShouldBeGrantedMembership()
     {
         // Arrange
@@ -315,7 +337,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = SetupTest(context);
+        var ams = await SetupTest(context);
 
         // Act
         await ams.RunAsync();
@@ -337,7 +359,7 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        SetupTest(context);
+        await SetupTest(context);
 
         // Act
         var service = context.DiscordService as MockDiscordService;
@@ -356,7 +378,7 @@ public static class AutoMemberSystemTests
 	public static async Task AutoMemberSystem_MemberMetadataUpdated_ShouldBeReflectedInDynamo()
 	{
 		// Arrange
-		const string NewUsername = "fred";
+		const string newUsername = "fred";
 
 		var context = await AutoMemberSystemContext.Builder()
 			.Joined(TimeSpan.FromHours(1))
@@ -367,7 +389,7 @@ public static class AutoMemberSystemTests
 			.WithMessages(100)
 			.Build();
 
-		SetupTest(context);
+		await SetupTest(context);
 
 		// Make sure the user is in the database
 		context.DynamoService.Should().NotBeNull(because: "Test is invalid if DynamoService is not set");
@@ -377,7 +399,7 @@ public static class AutoMemberSystemTests
 		MockDiscordService mds = (MockDiscordService) context.DiscordService!;
 
 		var newUser = context.User!.Clone();
-		newUser.Username = NewUsername;
+		newUser.Username = newUsername;
 
 		await mds.TriggerUserUpdated(new UserUpdatedEventArgs(context.UserID, context.User, newUser));
 
@@ -385,11 +407,11 @@ public static class AutoMemberSystemTests
 		var ddbUser = await context.DynamoService.GetUserAsync(context.UserID);
 
 		ddbUser.Should().NotBeNull();
-		ddbUser.Data.Username.Should().Be(NewUsername);
+		ddbUser.Data.Username.Should().Be(newUsername);
 
 		ddbUser.Data.Usernames.Should().NotBeNull();
 		ddbUser.Data.Usernames.Count.Should().Be(2);
-		ddbUser.Data.Usernames.Should().Contain(n => n.Data != null && n.Data.Equals(NewUsername, StringComparison.Ordinal));
+		ddbUser.Data.Usernames.Should().Contain(n => n.Data != null && n.Data.Equals(newUsername, StringComparison.Ordinal));
 	}
 
 	[Fact(DisplayName = "A user should be created in DynamoDB if they're eligible for membership but missing in DDB")]
@@ -405,7 +427,7 @@ public static class AutoMemberSystemTests
 			.SuppressDDBEntry()
 			.Build();
 
-		var ams = SetupTest(context);
+		var ams = await SetupTest(context);
 
 		// Act
 		await ams.RunAsync();
@@ -459,9 +481,10 @@ public static class AutoMemberSystemTests
         private Snowflake[]? _roles;
         private bool _postedIntroduction;
         private int _messagesLast24Hours;
-        private bool _gaiusAvailable = true;
-        private bool _gaiusPunished;
-        private bool _gaiusWarned;
+		private bool _gaiusAvailable = true;
+		private bool _gaiusPunished;
+		private bool _joinAgeKick;
+		private bool _gaiusWarned;
         private int _firstJoinTime;
         private bool _grantedMembershipBefore;
 		private bool _suppressDDB;
@@ -496,10 +519,12 @@ public static class AutoMemberSystemTests
             return this;
         }
 
-        public AutoMemberSystemContextBuilder HasBeenPunished()
+        public AutoMemberSystemContextBuilder HasBeenPunished(bool isJoinAgeKick = false)
         {
             _gaiusPunished = true;
-            return this;
+			_joinAgeKick = isJoinAgeKick;
+
+			return this;
         }
 
         public AutoMemberSystemContextBuilder HasBeenWarned()
@@ -541,8 +566,8 @@ public static class AutoMemberSystemTests
             {
                 testContext.AddCaselog(userId, new Caselog
                 {
-                    Type = CaselogType.Mute,
-                    Reason = "TEST PUNISHMENT",
+                    Type = _joinAgeKick ? CaselogType.Kick : CaselogType.Mute,
+                    Reason = _joinAgeKick ? "Join age punishment" : "TEST PUNISHMENT",
                     ModID = Snowflake.Generate(),
                     UserID = userId
                 });

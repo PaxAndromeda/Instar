@@ -25,4 +25,6 @@ public interface IAutoMemberSystem
 	/// </list>
 	/// </remarks>
 	MembershipEligibility CheckEligibility(InstarDynamicConfiguration cfg, IGuildUser user);
+
+	Task Initialize();
 }

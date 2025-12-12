@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using JetBrains.Annotations;
 
 namespace PaxAndromeda.Instar.Metrics;
 
@@ -46,6 +45,14 @@ public enum Metric
 	[MetricName("AMH Application Failures")]
 	AMS_AMHFailures,
 
+	[MetricDimension("Service", "Birthday System")]
+	[MetricName("Birthday System Failures")]
+	BirthdaySystem_Failures,
+
+	[MetricDimension("Service", "Birthday System")]
+	[MetricName("Birthday Grants")]
+	BirthdaySystem_Grants,
+
 	[MetricDimension("Service", "Discord")]
     [MetricName("Messages Sent")]
     Discord_MessagesSent,
@@ -60,6 +67,13 @@ public enum Metric
     
     [MetricDimension("Service", "Discord")]
     [MetricName("Users Left")]
-    [UsedImplicitly]
-    Discord_UsersLeft
+    Discord_UsersLeft,
+
+	[MetricDimension("Service", "Gaius")]
+	[MetricName("Gaius API Calls")]
+	Gaius_APICalls,
+
+	[MetricDimension("Service", "Gaius")]
+	[MetricName("Gaius API Latency")]
+	Gaius_APILatency
 }

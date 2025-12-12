@@ -30,15 +30,15 @@ public class ArbitraryDynamoDBTypeConverter<T>: IPropertyConverter where T: new(
          * to DynamoDBv2 SDK, otherwise we'll just apply this arbitrary type converter.
          */
 
-        return ToDynamoDBEntry(value);
+        return ToDynamoDbEntry(value);
     }
 
-    public object FromEntry(DynamoDBEntry entry)
+    public object? FromEntry(DynamoDBEntry entry)
     {
         return FromDynamoDBEntry<T>(entry.AsDocument());
     }
 
-    private static Document ToDynamoDBEntry(object obj, int maxDepth = 3, int currentDepth = 0)
+    private static Document ToDynamoDbEntry(object obj, int maxDepth = 3, int currentDepth = 0)
     {
         ArgumentNullException.ThrowIfNull(obj);
 
@@ -62,10 +62,10 @@ public class ArbitraryDynamoDBTypeConverter<T>: IPropertyConverter where T: new(
             // Check if a DynamoDBProperty is defined on the property
             if (Attribute.IsDefined(property, typeof(DynamoDBPropertyAttribute)))
             {
-                var dynamoDBProperty = property.GetCustomAttribute<DynamoDBPropertyAttribute>();
-                if (!string.IsNullOrEmpty(dynamoDBProperty?.AttributeName))
+                var dynamoDbProperty = property.GetCustomAttribute<DynamoDBPropertyAttribute>();
+                if (!string.IsNullOrEmpty(dynamoDbProperty?.AttributeName))
                 {
-                    propertyName = dynamoDBProperty.AttributeName;
+                    propertyName = dynamoDbProperty.AttributeName;
                 }
             }
 
@@ -81,56 +81,57 @@ public class ArbitraryDynamoDBTypeConverter<T>: IPropertyConverter where T: new(
             else
             {
                 // Perform recursive or native handling
-                doc[propertyName] = ConvertToDynamoDBValue(propertyValue, maxDepth, currentDepth + 1);
+                doc[propertyName] = ConvertToDynamoDbValue(propertyValue, maxDepth, currentDepth + 1);
             }
         }
 
         return doc;
     }
 
-    private static DynamoDBEntry ConvertToDynamoDBValue(object value, int maxDepth, int currentDepth)
+    private static DynamoDBEntry ConvertToDynamoDbValue(object? value, int maxDepth, int currentDepth)
     {
-        if (value == null) return new Primitive();
-
-        // Handle primitive types natively supported by DynamoDB
-        if (value is string || value is bool || value is int || value is long || value is short || value is double || value is float || value is decimal)
+        switch (value)
         {
-            return new Primitive
-            {
-                Value = value
-            };
-        }
-
-        // Handle DateTime
-        if (value is DateTime dateTimeVal)
-        {
-            return new Primitive
-            {
-                Value = dateTimeVal.ToString("o")
-            };
-        }
-
-        // Handle collections (e.g., arrays, lists)
-        if (value is IEnumerable enumerable)
-        {
-            var list = new DynamoDBList();
-            foreach (var element in enumerable)
-            {
-                list.Add(ConvertToDynamoDBValue(element, maxDepth, currentDepth));
-            }
-            return list;
+	        case null:
+		        return new Primitive();
+	        // Handle primitive types natively supported by DynamoDB
+	        case string:
+	        case bool:
+	        case int:
+	        case long:
+	        case short:
+	        case double:
+	        case float:
+	        case decimal:
+		        return new Primitive
+		        {
+			        Value = value
+		        };
+	        // Handle DateTime
+	        case DateTime dateTimeVal:
+		        return new Primitive
+		        {
+			        Value = dateTimeVal.ToString("o")
+		        };
+	        // Handle collections (e.g., arrays, lists)
+	        case IEnumerable enumerable:
+	        {
+		        var list = new DynamoDBList();
+		        foreach (var element in enumerable)
+		        {
+			        list.Add(ConvertToDynamoDbValue(element, maxDepth, currentDepth));
+		        }
+		        return list;
+	        }
         }
 
         // Handle objects recursively
-        if (value.GetType().IsClass)
-        {
-            return ToDynamoDBEntry(value, maxDepth, currentDepth);
-        }
-
-        throw new InvalidOperationException($"Cannot convert type {value.GetType()} to DynamoDBEntry.");
+        return value.GetType().IsClass 
+			? ToDynamoDbEntry(value, maxDepth, currentDepth) 
+			: throw new InvalidOperationException($"Cannot convert type {value.GetType()} to DynamoDBEntry.");
     }
     
-    public static T FromDynamoDBEntry<T>(Document document, int maxDepth = 3, int currentDepth = 0) where T : new()
+    public static TObj FromDynamoDBEntry<TObj>(Document document, int maxDepth = 3, int currentDepth = 0) where TObj : new()
     {
         if (document == null)
             throw new ArgumentNullException(nameof(document));
@@ -138,7 +139,7 @@ public class ArbitraryDynamoDBTypeConverter<T>: IPropertyConverter where T: new(
         if (currentDepth > maxDepth)
             throw new InvalidOperationException("Max recursion depth reached.");
 
-        var obj = new T();
+        var obj = new TObj();
 
         foreach (var property in typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -160,9 +161,8 @@ public class ArbitraryDynamoDBTypeConverter<T>: IPropertyConverter where T: new(
             }
 
             // Check if the document contains the property
-            if (!document.ContainsKey(propertyName)) continue;
+            if (!document.TryGetValue(propertyName, out DynamoDBEntry? entry)) continue;
 
-            var entry = document[propertyName];
             var converterAttr = property.GetCustomAttribute<DynamoDBPropertyAttribute>()?.Converter;
 
             if (converterAttr != null && Activator.CreateInstance(converterAttr) is IPropertyConverter converter)
@@ -210,7 +210,8 @@ public class ArbitraryDynamoDBTypeConverter<T>: IPropertyConverter where T: new(
                     throw new InvalidOperationException($"Cannot determine element type for target type: {targetType}");
 
                 var enumerableType = typeof(List<>).MakeGenericType(elementType);
-                var resultList = (IList)Activator.CreateInstance(enumerableType);
+                if (Activator.CreateInstance(enumerableType) is not IList resultList)
+					throw new InvalidOperationException($"Failed to create an IList of target type {targetType}");
                 foreach (var element in list.Entries)
                 {
                     resultList.Add(FromDynamoDBValue(elementType, element, maxDepth, currentDepth));

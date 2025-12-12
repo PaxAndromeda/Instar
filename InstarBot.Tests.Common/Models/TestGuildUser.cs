@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Discord;
+using Moq;
 
 #pragma warning disable CS8625
 
@@ -7,9 +8,9 @@ namespace InstarBot.Tests.Models;
 
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 [SuppressMessage("ReSharper", "AutoPropertyCanBeMadeGetOnly.Global")]
-public sealed class TestGuildUser : IGuildUser
+public  class TestGuildUser : IGuildUser
 {
-    private readonly List<ulong> _roleIds = null!;
+    private readonly List<ulong> _roleIds = [ ];
 
     public ulong Id { get; init; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -35,7 +36,9 @@ public sealed class TestGuildUser : IGuildUser
     public bool IsVideoing { get; set; }
     public DateTimeOffset? RequestToSpeakTimestamp { get; set; }
 
-    public string GetAvatarUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
+	private readonly Mock<IDMChannel> _dmChannelMock = new();
+
+	public string GetAvatarUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
     {
         return string.Empty;
     }
@@ -47,7 +50,7 @@ public sealed class TestGuildUser : IGuildUser
 
     public Task<IDMChannel> CreateDMChannelAsync(RequestOptions options = null!)
     {
-        throw new NotImplementedException();
+		return Task.FromResult(_dmChannelMock.Object);
     }
 
     public ChannelPermissions GetPermissions(IGuildChannel channel)
@@ -159,7 +162,7 @@ public sealed class TestGuildUser : IGuildUser
     public string GuildAvatarId { get; set; } = null!;
     public GuildPermissions GuildPermissions { get; set; }
     public IGuild Guild { get; set; } = null!;
-    public ulong GuildId { get; set; }
+	public ulong GuildId => TestUtilities.GuildID;
     public DateTimeOffset? PremiumSince { get; set; }
 
     public IReadOnlyCollection<ulong> RoleIds

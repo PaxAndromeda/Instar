@@ -54,7 +54,7 @@ public class InstarEligibilityEmbed(IGuildUser user, MembershipEligibility eligi
 
 		eligibilityBuilder.AppendLine(BuildEligibilitySnippet(Strings.Command_CheckEligibility_RolesEligibility, !eligibility.HasFlag(MembershipEligibility.MissingRoles)));
 		eligibilityBuilder.AppendLine(BuildEligibilitySnippet(Strings.Command_CheckEligibility_IntroductionEligibility, !eligibility.HasFlag(MembershipEligibility.MissingIntroduction)));
-		eligibilityBuilder.AppendLine(BuildEligibilitySnippet(Strings.Command_CheckEligibility_JoinAgeEligibility, !eligibility.HasFlag(MembershipEligibility.TooYoung)));
+		eligibilityBuilder.AppendLine(BuildEligibilitySnippet(Strings.Command_CheckEligibility_JoinAgeEligibility, !eligibility.HasFlag(MembershipEligibility.InadequateTenure)));
 		eligibilityBuilder.AppendLine(BuildEligibilitySnippet(Strings.Command_CheckEligibility_ModActionsEligibility, !eligibility.HasFlag(MembershipEligibility.PunishmentReceived)));
 		eligibilityBuilder.AppendLine(BuildEligibilitySnippet(Strings.Command_CheckEligibility_MessagesEligibility, !eligibility.HasFlag(MembershipEligibility.NotEnoughMessages)));
 

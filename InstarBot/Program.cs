@@ -23,17 +23,18 @@ internal static class Program
     {
         AppDomain.CurrentDomain.UnhandledException += CurrentDomainOnUnhandledException;
 
-        var cli = Parser.Default.ParseArguments<CommandLineOptions>(args).Value;
 
 #if DEBUG
         var configPath = "Config/Instar.debug.conf.json";
 #else
+        var cli = Parser.Default.ParseArguments<CommandLineOptions>(args).Value;
+
         var configPath = "Config/Instar.conf.json";
         if (!string.IsNullOrEmpty(cli.ConfigPath))
             configPath = cli.ConfigPath;
 #endif
-        
-        Log.Information("Config path is {Path}", configPath);
+
+		Log.Information("Config path is {Path}", configPath);
         IConfiguration config = new ConfigurationBuilder()
             .AddJsonFile(configPath)
             .Build();
@@ -68,9 +69,17 @@ internal static class Program
         var dynamicConfig = _services.GetRequiredService<IDynamicConfigService>();
         await dynamicConfig.Initialize();
 
-        var discordService = _services.GetRequiredService<IDiscordService>();
+		var discordService = _services.GetRequiredService<IDiscordService>();
         await discordService.Start(_services);
-    }
+
+		// Start up other systems
+		List<Task> tasks = [
+			_services.GetRequiredService<IBirthdaySystem>().Initialize(),
+			_services.GetRequiredService<IAutoMemberSystem>().Initialize()
+		];
+
+		Task.WaitAll(tasks);
+	}
 
     private static void InitializeLogger(IConfiguration config)
     {
@@ -121,14 +130,21 @@ internal static class Program
         // Services
         services.AddSingleton<TeamService>();
         services.AddTransient<IInstarDDBService, InstarDDBService>();
-        services.AddTransient<IMetricService, CloudwatchMetricService>();
         services.AddTransient<IGaiusAPIService, GaiusAPIService>();
         services.AddSingleton<IDiscordService, DiscordService>();
-        services.AddSingleton<IAutoMemberSystem, AutoMemberSystem>();
-        services.AddSingleton<IDynamicConfigService, AWSDynamicConfigService>();
-        
-        // Commands & Interactions
-        services.AddTransient<PingCommand>();
+		services.AddSingleton<IAutoMemberSystem, AutoMemberSystem>();
+		services.AddSingleton<IBirthdaySystem, BirthdaySystem>();
+		services.AddSingleton<IDynamicConfigService, AWSDynamicConfigService>();
+		services.AddSingleton(TimeProvider.System);
+
+#if DEBUG
+		services.AddSingleton<IMetricService, FileSystemMetricService>();
+#else
+        services.AddTransient<IMetricService, CloudwatchMetricService>();
+#endif
+
+		// Commands & Interactions
+		services.AddTransient<PingCommand>();
         services.AddTransient<SetBirthdayCommand>();
         services.AddSingleton<PageCommand>();
         services.AddTransient<IContextCommand, ReportUserCommand>();
