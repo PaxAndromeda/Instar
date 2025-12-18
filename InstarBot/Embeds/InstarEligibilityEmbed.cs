@@ -1,7 +1,7 @@
-﻿using Discord;
-using PaxAndromeda.Instar.DynamoModels;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using Discord;
+using PaxAndromeda.Instar.DynamoModels;
 
 namespace PaxAndromeda.Instar.Embeds;
 

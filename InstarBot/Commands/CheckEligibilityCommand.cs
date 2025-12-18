@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Discord;
 using Discord.Interactions;
 using JetBrains.Annotations;
@@ -6,7 +7,6 @@ using PaxAndromeda.Instar.Embeds;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 using Serilog;
-using System.Diagnostics.CodeAnalysis;
 
 namespace PaxAndromeda.Instar.Commands;
 
@@ -14,7 +14,7 @@ namespace PaxAndromeda.Instar.Commands;
 public class CheckEligibilityCommand(
     IDynamicConfigService dynamicConfig,
     IAutoMemberSystem autoMemberSystem,
-	IInstarDDBService ddbService,
+	IDatabaseService ddbService,
     IMetricService metricService)
     : BaseCommand
 {

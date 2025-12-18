@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
-using Amazon.AppConfigData;
 using Amazon;
+using Amazon.AppConfigData;
 using Amazon.AppConfigData.Model;
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;

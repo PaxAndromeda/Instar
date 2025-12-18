@@ -32,7 +32,7 @@ public static class Utilities
 		/// A list of attributes of the specified type associated with the enum value;
 		/// or <c>null</c> if no attributes of the specified type are found.
 		/// </returns>
-		public  List<T>? GetAttributesOfType<T>() where T : Attribute
+		public List<T>? GetAttributesOfType<T>() where T : Attribute
 		{
 			var type = enumVal.GetType();
 			var membersInfo = type.GetMember(enumVal.ToString());
@@ -52,7 +52,7 @@ public static class Utilities
 		/// The first custom attribute of type <typeparamref name="T"/> if found;
 		/// otherwise, <c>null</c>.
 		/// </returns>
-		public  T? GetAttributeOfType<T>() where T : Attribute
+		public T? GetAttributeOfType<T>() where T : Attribute
 		{
 			var type = enumVal.GetType();
 			var membersInfo = type.GetMember(enumVal.ToString());

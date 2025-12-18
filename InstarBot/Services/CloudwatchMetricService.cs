@@ -1,9 +1,11 @@
+using System.Collections.Specialized;
 using System.Net;
 using Amazon;
 using Amazon.CloudWatch;
 using Amazon.CloudWatch.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Configuration;
+using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Metrics;
 using Serilog;
 using Metric = PaxAndromeda.Instar.Metrics.Metric;
@@ -26,8 +28,29 @@ public sealed class CloudwatchMetricService : IMetricService
         _client = new AmazonCloudWatchClient(new AWSIAMCredential(config), RegionEndpoint.GetBySystemName(region));
     }
 
-    public async Task<bool> Emit(Metric metric, double value)
-    {
+	public Task<bool> Emit(Metric metric, double value)
+	{
+		try
+		{
+			var dimensions = new Dictionary<string, string>();
+
+			var attrs = metric.GetAttributesOfType<MetricDimensionAttribute>();
+			if (attrs == null)
+				return Emit(metric, value, dimensions);
+
+			foreach (var dim in attrs)
+				dimensions.Add(dim.Name, dim.Value);
+
+			return Emit(metric, value, dimensions);
+		} catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to emit metric {Metric} with value {Value}", metric, value);
+			return Task.FromResult(false);
+		}
+	}
+
+	public async Task<bool> Emit(Metric metric, double value, Dictionary<string, string> dimensions)
+	{
 		for (var attempt = 1; attempt <= MaxAttempts; attempt++)
 		{
 			try
@@ -45,12 +68,19 @@ public sealed class CloudwatchMetricService : IMetricService
 				if (attrs != null)
 					foreach (var dim in attrs)
 					{
+						// Always prefer the passed-in dimensions over attribute-defined ones when there's a conflict
+						if (!dimensions.ContainsKey(dim.Name))
+							dimensions.Add(dim.Name, dim.Value);
+
 						datum.Dimensions.Add(new Dimension
 						{
 							Name = dim.Name,
 							Value = dim.Value
 						});
 					}
+
+				foreach (var (dName, dValue) in dimensions)
+					datum.Dimensions.Add(new Dimension { Name = dName, Value = dValue });
 
 				var response = await _client.PutMetricDataAsync(new PutMetricDataRequest
 				{
@@ -59,7 +89,8 @@ public sealed class CloudwatchMetricService : IMetricService
 				});
 
 				return response.HttpStatusCode == HttpStatusCode.OK;
-			} catch (Exception ex) when (IsTransient(ex) && attempt < MaxAttempts)
+			}
+			catch (Exception ex) when (IsTransient(ex) && attempt < MaxAttempts)
 			{
 				var expo = Math.Pow(2, attempt - 1);
 				var jitter = TimeSpan.FromMilliseconds(new Random().NextDouble() * 100);

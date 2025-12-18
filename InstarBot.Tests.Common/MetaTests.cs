@@ -3,7 +3,7 @@ using Xunit;
 
 namespace InstarBot.Tests;
 
-public class MetaTests
+public static class MetaTests
 {
 	[Fact]
 	public static void MatchesFormat_WithValidText_ShouldReturnTrue()

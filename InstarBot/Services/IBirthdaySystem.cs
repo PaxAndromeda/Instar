@@ -2,11 +2,8 @@
 
 namespace PaxAndromeda.Instar.Services;
 
-public interface IBirthdaySystem
+public interface IBirthdaySystem : IScheduledService
 {
-	Task Initialize();
-	Task RunAsync();
-
 	/// <summary>
 	/// Grants the birthday role to a user outside the normal birthday check process. For example, a
 	/// user sets their birthday to today via command.

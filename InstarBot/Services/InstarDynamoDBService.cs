@@ -1,4 +1,5 @@
-﻿using Amazon;
+﻿using System.Diagnostics.CodeAnalysis;
+using Amazon;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.DocumentModel;
@@ -6,18 +7,17 @@ using Discord;
 using Microsoft.Extensions.Configuration;
 using PaxAndromeda.Instar.DynamoModels;
 using Serilog;
-using System.Diagnostics.CodeAnalysis;
 
 namespace PaxAndromeda.Instar.Services;
 
 [ExcludeFromCodeCoverage]
-public sealed class InstarDDBService : IInstarDDBService
+public sealed class InstarDynamoDBService : IDatabaseService
 {
 	private readonly TimeProvider _timeProvider;
 	private readonly DynamoDBContext _ddbContext;
 	private readonly string _guildId;
 
-    public InstarDDBService(IConfiguration config, TimeProvider timeProvider)
+    public InstarDynamoDBService(IConfiguration config, TimeProvider timeProvider)
     {
 	    _timeProvider = timeProvider;
 	    var region = config.GetSection("AWS").GetValue<string>("Region");
@@ -45,16 +45,21 @@ public sealed class InstarDDBService : IInstarDDBService
             Log.Error(ex, "Failed to get user data for {Snowflake}", snowflake);
             return null;
         }
-    }
+	}
 
-    public async Task<InstarDatabaseEntry<InstarUserData>> GetOrCreateUserAsync(IGuildUser user)
-    {
-        var data = await _ddbContext.LoadAsync<InstarUserData>(_guildId, user.Id.ToString()) ?? InstarUserData.CreateFrom(user);
+	public async Task<InstarDatabaseEntry<InstarUserData>> GetOrCreateUserAsync(IGuildUser user)
+	{
+		var data = await _ddbContext.LoadAsync<InstarUserData>(_guildId, user.Id.ToString()) ?? InstarUserData.CreateFrom(user);
 
-        return new InstarDatabaseEntry<InstarUserData>(_ddbContext, data);
-    }
+		return new InstarDatabaseEntry<InstarUserData>(_ddbContext, data);
+	}
 
-    public async Task<List<InstarDatabaseEntry<InstarUserData>>> GetBatchUsersAsync(IEnumerable<Snowflake> snowflakes)
+	public async Task<InstarDatabaseEntry<Notification>> CreateNotificationAsync(Notification notification)
+	{
+		return new InstarDatabaseEntry<Notification>(_ddbContext, notification);
+	}
+
+	public async Task<List<InstarDatabaseEntry<InstarUserData>>> GetBatchUsersAsync(IEnumerable<Snowflake> snowflakes)
     {
         var batches = _ddbContext.CreateBatchGet<InstarUserData>();
         foreach (var snowflake in snowflakes)
@@ -64,6 +69,34 @@ public sealed class InstarDDBService : IInstarDDBService
 
         return batches.Results.Select(x => new InstarDatabaseEntry<InstarUserData>(_ddbContext, x)).ToList();
     }
+
+	public async Task<List<InstarDatabaseEntry<Notification>>> GetPendingNotifications()
+	{
+		var currentTime = _timeProvider.GetUtcNow();
+
+		var config = new QueryOperationConfig
+		{
+			KeyExpression = new Expression
+			{
+				ExpressionStatement = "guild_id = :g AND #DATE <= :now",
+				ExpressionAttributeNames = new Dictionary<string, string>
+				{
+					["#DATE"] = "date"
+				},
+				ExpressionAttributeValues = new Dictionary<string, DynamoDBEntry>
+				{
+					[":g"]   = _guildId,
+					[":now"] = currentTime.ToString("O")
+				}
+			}
+		};
+
+		var search = _ddbContext.FromQueryAsync<Notification>(config);
+
+		var results = await search.GetRemainingAsync().ConfigureAwait(false);
+
+		return results.Select(u => new InstarDatabaseEntry<Notification>(_ddbContext, u)).ToList();
+	}
 
 	public async Task<List<InstarDatabaseEntry<InstarUserData>>> GetUsersByBirthday(DateTimeOffset birthdate, TimeSpan fuzziness)
 	{

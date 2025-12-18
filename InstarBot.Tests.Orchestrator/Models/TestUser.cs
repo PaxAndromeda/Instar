@@ -1,13 +1,18 @@
-﻿using Discord;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
+using Discord;
+using Moq;
 using PaxAndromeda.Instar;
 
-namespace InstarBot.Tests.Models;
+namespace InstarBot.Test.Framework.Models;
 
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 [SuppressMessage("ReSharper", "AutoPropertyCanBeMadeGetOnly.Global")]
-public class TestUser : IUser
+public class TestUser : IMockOf<IUser>, IUser
 {
+	public Mock<IDMChannel> DMChannelMock { get; } = new();
+
+	public Mock<IUser> Mock { get; } = new();
+
 	public TestUser(Snowflake snowflake)
 	{
 		Id = snowflake;
@@ -45,27 +50,27 @@ public class TestUser : IUser
 
 	public string GetAvatarUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
 	{
-		return string.Empty;
+		return Mock.Object.GetAvatarUrl(format, size);
 	}
 
 	public string GetDefaultAvatarUrl()
 	{
-		return string.Empty;
+		return Mock.Object.GetDefaultAvatarUrl();
 	}
 
 	public string GetDisplayAvatarUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
 	{
-		throw new NotImplementedException();
+		return Mock.Object.GetDisplayAvatarUrl(format, size);
 	}
 
-	public Task<IDMChannel> CreateDMChannelAsync(RequestOptions? options = null)
+	public Task<IDMChannel> CreateDMChannelAsync(RequestOptions options = null)
 	{
-		throw new NotImplementedException();
+		return Task.FromResult(DMChannelMock.Object);
 	}
 
 	public string GetAvatarDecorationUrl()
 	{
-		return string.Empty;
+		return Mock.Object.GetAvatarDecorationUrl();
 	}
 
 	public string AvatarId { get; set; }

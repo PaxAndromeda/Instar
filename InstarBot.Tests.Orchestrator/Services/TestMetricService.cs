@@ -2,9 +2,9 @@ using JetBrains.Annotations;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 
-namespace InstarBot.Tests.Services;
+namespace InstarBot.Test.Framework.Services;
 
-public sealed class MockMetricService : IMetricService
+public sealed class TestMetricService : IMetricService
 {
     private readonly List<(Metric, double)> _emittedMetrics = [];
     
@@ -13,6 +13,12 @@ public sealed class MockMetricService : IMetricService
         _emittedMetrics.Add((metric, value));
         return Task.FromResult(true);
     }
+
+    public Task<bool> Emit(Metric metric, double value, Dictionary<string, string> dimensions)
+	{
+		_emittedMetrics.Add((metric, value));
+		return Task.FromResult(true);
+	}
 
     [UsedImplicitly]
     public IEnumerable<double> GetMetricValues(Metric metric)

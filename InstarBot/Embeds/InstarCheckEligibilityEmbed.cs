@@ -1,5 +1,5 @@
-﻿using Discord;
-using System.Text;
+﻿using System.Text;
+using Discord;
 using PaxAndromeda.Instar.ConfigModels;
 
 namespace PaxAndromeda.Instar.Embeds;

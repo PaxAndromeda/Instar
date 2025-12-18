@@ -1,7 +1,9 @@
 ﻿using Discord;
 using FluentAssertions;
-using InstarBot.Tests.Services;
+using InstarBot.Test.Framework;
+using InstarBot.Test.Framework.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Testing.Platform.Extensions.Messages;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
@@ -14,15 +16,15 @@ namespace InstarBot.Tests.Integration.Interactions;
 
 public static class SetBirthdayCommandTests
 {
-    private static async Task<(IInstarDDBService, Mock<SetBirthdayCommand>, InstarDynamicConfiguration)> SetupMocks(SetBirthdayContext context, DateTime? timeOverride = null, bool throwError = false)
-    {
-        TestUtilities.SetupLogging();
+	/*private static async Task<(IDatabaseService, Mock<SetBirthdayCommand>, InstarDynamicConfiguration)> SetupOrchestrator(SetBirthdayContext context, DateTime? timeOverride = null, bool throwError = false)
+	{
+		TestUtilities.SetupLogging();
 
 		var timeProvider = TimeProvider.System;
 		if (timeOverride is not null)
 		{
 			var timeProviderMock = new Mock<TimeProvider>();
-			timeProviderMock.Setup(n => n.GetUtcNow()).Returns(new DateTimeOffset((DateTime)timeOverride));
+			timeProviderMock.Setup(n => n.GetUtcNow()).Returns(new DateTimeOffset((DateTime) timeOverride));
 			timeProvider = timeProviderMock.Object;
 		}
 
@@ -31,7 +33,7 @@ public static class SetBirthdayCommandTests
 		context.StaffAnnounceChannel = staffAnnounceChannelMock;
 		context.BirthdayAnnounceChannel = birthdayAnnounceChannelMock;
 
-		var ddbService = TestUtilities.GetServices().GetService<IInstarDDBService>();
+		var ddbService = TestUtilities.GetServices().GetService<IDatabaseService>();
 		var cfgService = TestUtilities.GetDynamicConfiguration();
 		var cfg = await cfgService.GetConfig();
 
@@ -57,7 +59,7 @@ public static class SetBirthdayCommandTests
 
 		var birthdaySystem = new BirthdaySystem(cfgService, discord, ddbService, new MockMetricService(), timeProvider);
 
-		if (throwError && ddbService is MockInstarDDBService mockDDB)
+		if (throwError && ddbService is MockDatabaseService mockDDB)
 			mockDDB.Setup(n => n.GetOrCreateUserAsync(It.IsAny<IGuildUser>())).Throws<BadStateException>();
 
 		var cmd = TestUtilities.SetupCommandMock(() => new SetBirthdayCommand(ddbService, TestUtilities.GetDynamicConfiguration(), new MockMetricService(), birthdaySystem, timeProvider), testContext);
@@ -65,20 +67,38 @@ public static class SetBirthdayCommandTests
 		await cmd.Object.Context.User!.AddRoleAsync(cfg.NewMemberRoleID);
 
 		cmd.Setup(n => n.Context.User!.GuildId).Returns(TestUtilities.GuildID);
-		
+
 		context.User = cmd.Object.Context.User!;
 
 		cmd.Setup(n => n.Context.Guild).Returns(guildMock.Object);
 
-		((MockInstarDDBService) ddbService).Register(InstarUserData.CreateFrom(cmd.Object.Context.User!));
+		((MockDatabaseService) ddbService).Register(InstarUserData.CreateFrom(cmd.Object.Context.User!));
 
 		ddbService.Should().NotBeNull();
 
-        return (ddbService, cmd, cfg);
-    }
+		return (ddbService, cmd, cfg);
+	}*/
+
+	private const ulong NewMemberRole = 796052052433698817ul;
+
+	private static async Task<TestOrchestrator> SetupOrchestrator(bool throwError = false)
+	{
+		var orchestrator = TestOrchestrator.Default;
+		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
+
+		if (throwError)
+		{
+			if (orchestrator.Database is not IMockOf<IDatabaseService> ddbService)
+				throw new InvalidOperationException("IDatabaseService was not mocked correctly.");
+
+			ddbService.Mock.Setup(n => n.GetOrCreateUserAsync(It.IsAny<IGuildUser>())).Throws<BadStateException>();
+		}
+
+		return orchestrator;
+	}
 
 
-    [Theory(DisplayName = "UserID should be able to set their birthday when providing a valid date.")]
+	[Theory(DisplayName = "UserID should be able to set their birthday when providing a valid date.")]
     [InlineData(1992, 7, 21, 0)]
     [InlineData(1992, 7, 21, -7)]
     [InlineData(1992, 7, 21, 7)]
@@ -87,22 +107,25 @@ public static class SetBirthdayCommandTests
     [InlineData(2010, 1, 1, 0)]
     public static async Task SetBirthdayCommand_WithValidDate_ShouldSetCorrectly(int year, int month, int day, int timezone)
     {
-        // Arrange
-        var context = new SetBirthdayContext(Snowflake.Generate(), year, month, day, timezone);
+		// Arrange
+		var date = new DateTimeOffset(year, month, day, 0, 0, 0, 0, TimeSpan.FromHours(timezone));
 
-        var (ddb, cmd, _) = await SetupMocks(context);
+		var orchestrator = await SetupOrchestrator();
+		orchestrator.SetTime(date);
+		var cmd = orchestrator.GetCommand<SetBirthdayCommand>();
 
-        // Act
-        await cmd.Object.SetBirthday((Month)context.Month, context.Day, context.Year, context.TimeZone);
+		// Act
+		await cmd.Object.SetBirthday((Month)month, day, year, timezone);
 
-        // Assert
-        var date = context.ToDateTime();
-        
-        var ddbUser = await ddb.GetUserAsync(context.UserID.ID);
+		// Assert
+
+		var database = orchestrator.GetService<IDatabaseService>();
+
+        var ddbUser = await database.GetUserAsync(orchestrator.Actor.Id);
 		ddbUser!.Data.Birthday.Should().NotBeNull();
 		ddbUser.Data.Birthday.Birthdate.UtcDateTime.Should().Be(date.UtcDateTime);
 		ddbUser.Data.Birthdate.Should().Be(date.UtcDateTime.ToString("MMddHHmm"));
-        TestUtilities.VerifyMessage(cmd, Strings.Command_SetBirthday_Success, true);
+        cmd.VerifyResponse(Strings.Command_SetBirthday_Success, true);
     }
 
     [Theory(DisplayName = "Attempting to set an invalid day or month number should emit an error message.")]
@@ -114,28 +137,25 @@ public static class SetBirthdayCommandTests
     [InlineData(2032, 2, 31)] // Leap year
     public static async Task SetBirthdayCommand_WithInvalidDate_ShouldReturnError(int year, int month, int day)
     {
-        // Arrange
-        var context = new SetBirthdayContext(Snowflake.Generate(), year, month, day);
+		// Arrange
+		var orchestrator = await SetupOrchestrator();
+		var cmd = orchestrator.GetCommand<SetBirthdayCommand>();
 
-        var (_, cmd, _) = await SetupMocks(context);
-
-        // Act
-        await cmd.Object.SetBirthday((Month)context.Month, context.Day, context.Year, context.TimeZone);
+		// Act
+		await cmd.Object.SetBirthday((Month)month, day, year);
 
         // Assert
         if (month is < 0 or > 12)
         {
-            TestUtilities.VerifyMessage(cmd,
-                Strings.Command_SetBirthday_MonthsOutOfRange, true);
+			cmd.VerifyResponse(Strings.Command_SetBirthday_MonthsOutOfRange, true);
         }
         else
         {
-            var date = new DateTime(context.Year, context.Month, 1); // there's always a 1st of the month
-            var daysInMonth = DateTime.DaysInMonth(context.Year, context.Month);
+            var date = new DateTime(year, month, 1); // there's always a 1st of the month
+            var daysInMonth = DateTime.DaysInMonth(year, month);
 
-            // Assert
-            TestUtilities.VerifyMessage(cmd,
-                Strings.Command_SetBirthday_DaysInMonthOutOfRange, true);
+			// Assert
+			cmd.VerifyResponse(Strings.Command_SetBirthday_DaysInMonthOutOfRange, true);
         }
 	}
 
@@ -143,82 +163,76 @@ public static class SetBirthdayCommandTests
 	public static async Task SetBirthdayCommand_WithDateInFuture_ShouldReturnError()
 	{
 		// Arrange
-		// Note: Update this in the year 9,999
-		var context = new SetBirthdayContext(Snowflake.Generate(), 9999, 1, 1);
-
-		var (_, cmd, _) = await SetupMocks(context);
+		var orchestrator = await SetupOrchestrator();
+		var cmd = orchestrator.GetCommand<SetBirthdayCommand>();
 
 		// Act
-		await cmd.Object.SetBirthday((Month) context.Month, context.Day, context.Year, context.TimeZone);
+		await cmd.Object.SetBirthday(Month.January, 1, 9999);
 
 		// Assert
-		TestUtilities.VerifyMessage(cmd, Strings.Command_SetBirthday_NotTimeTraveler, true);
+		cmd.VerifyResponse(Strings.Command_SetBirthday_NotTimeTraveler, true);
 	}
 
 	[Fact(DisplayName = "Attempting to set a birthday when user has already set one should emit an error message.")]
 	public static async Task SetBirthdayCommand_BirthdayAlreadyExists_ShouldReturnError()
 	{
 		// Arrange
-		// Note: Update this in the year 9,999
-		var context = new SetBirthdayContext(Snowflake.Generate(), 2000, 1, 1);
+		var orchestrator = await SetupOrchestrator();
+		var cmd = orchestrator.GetCommand<SetBirthdayCommand>();
 
-		var (ddb, cmd, _) = await SetupMocks(context);
-
-		var dbUser = await ddb.GetOrCreateUserAsync(context.User);
+		var database = orchestrator.GetService<IDatabaseService>();
+		var dbUser = await database.GetOrCreateUserAsync(orchestrator.Actor);
 		dbUser.Data.Birthday = new Birthday(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc, TimeProvider.System);
 		dbUser.Data.Birthdate = dbUser.Data.Birthday.Key;
-		await dbUser.UpdateAsync();
+		await dbUser.CommitAsync();
 
 
 		// Act
-		await cmd.Object.SetBirthday((Month) context.Month, context.Day, context.Year, context.TimeZone);
+		await cmd.Object.SetBirthday(Month.January, 1, 2000);
 
 		// Assert
-		TestUtilities.VerifyMessage(cmd, Strings.Command_SetBirthday_Error_AlreadySet, true);
+		cmd.VerifyResponse(Strings.Command_SetBirthday_Error_AlreadySet, true);
 	}
 
 	[Fact(DisplayName = "An exception should return a message.")]
 	public static async Task SetBirthdayCommand_WithException_ShouldPromptUserToTryAgainLater()
 	{
 		// Arrange
-		// Note: Update this in the year 9,999
-		var context = new SetBirthdayContext(Snowflake.Generate(), 2000, 1, 1);
-
-		var (_, cmd, _) = await SetupMocks(context, throwError: true);
+		var orchestrator = await SetupOrchestrator(throwError: true);
+		var cmd = orchestrator.GetCommand<SetBirthdayCommand>();
 
 		// Act
-		await cmd.Object.SetBirthday((Month) context.Month, context.Day, context.Year, context.TimeZone);
+		await cmd.Object.SetBirthday(Month.January, 1, 1);
 
 		// Assert
-		TestUtilities.VerifyMessage(cmd, Strings.Command_SetBirthday_Error_CouldNotSetBirthday, true);
+		cmd.VerifyResponse(Strings.Command_SetBirthday_Error_CouldNotSetBirthday, true);
 	}
 
 	[Fact(DisplayName = "Attempting to set an underage birthday should result in an AMH and staff notification.")]
 	public static async Task SetBirthdayCommand_WithUnderage_ShouldNotifyStaff()
 	{
 		// Arrange
-		// Note: Update this in the year 9,999
-		var context = new SetBirthdayContext(Snowflake.Generate(), 2000, 1, 1);
-
-		var (ddb, cmd, cfg) = await SetupMocks(context, new DateTime(2010, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+		var orchestrator = await SetupOrchestrator();
+		orchestrator.SetTime(new DateTime(2010, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+		var cmd = orchestrator.GetCommand<SetBirthdayCommand>();
 
 		// Act
-		await cmd.Object.SetBirthday((Month) context.Month, context.Day, context.Year, context.TimeZone);
+		await cmd.Object.SetBirthday(Month.January, 1, 2000);
 
 		// Assert
-		var date = context.ToDateTime();
+		var date = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-		var ddbUser = await ddb.GetUserAsync(context.UserID.ID);
+		var ddbUser = await orchestrator.Database.GetUserAsync(orchestrator.Actor.Id);
 		ddbUser!.Data.Birthday.Should().NotBeNull();
 		ddbUser.Data.Birthday.Birthdate.UtcDateTime.Should().Be(date.UtcDateTime);
 		ddbUser.Data.Birthdate.Should().Be(date.UtcDateTime.ToString("MMddHHmm"));
 
 		ddbUser.Data.AutoMemberHoldRecord.Should().NotBeNull();
-		ddbUser.Data.AutoMemberHoldRecord!.ModeratorID.Should().Be(cfg.BotUserID);
+		ddbUser.Data.AutoMemberHoldRecord!.ModeratorID.Should().Be(orchestrator.Configuration.BotUserID);
 
-		TestUtilities.VerifyMessage(cmd, Strings.Command_SetBirthday_Success, true);
+		cmd.VerifyResponse(Strings.Command_SetBirthday_Success, true);
 
-		var staffAnnounceChannel = cmd.Object.Context.Guild.GetTextChannel(cfg.StaffAnnounceChannel);
+		var staffAnnounceChannel = cmd.Object.Context.Guild.GetTextChannel(orchestrator.Configuration.StaffAnnounceChannel);
 		staffAnnounceChannel.Should().NotBeNull();
 
 
@@ -226,53 +240,39 @@ public static class SetBirthdayCommandTests
 		var embedVerifier = EmbedVerifier.Builder()
 			.WithDescription(Strings.Embed_UnderageUser_WarningTemplate_NewMember).Build();
 
-		TestUtilities.VerifyChannelEmbed(context.StaffAnnounceChannel, embedVerifier, $"<@&{cfg.StaffRoleID}>");
+		orchestrator.GetChannel(orchestrator.Configuration.StaffAnnounceChannel)
+			.VerifyEmbed(embedVerifier, $"<@&{orchestrator.Configuration.StaffRoleID}>");
 	}
 
 	[Fact(DisplayName = "Attempting to set a birthday to today should grant the birthday role.")]
 	public static async Task SetBirthdayCommand_BirthdayIsToday_ShouldGrantBirthdayRoles()
 	{
 		// Arrange
-		// Note: Update this in the year 9,999
-		var context = new SetBirthdayContext(Snowflake.Generate(), 2000, 1, 1);
+		var date = new DateTimeOffset(new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc));
 
-		var (ddb, cmd, cfg) = await SetupMocks(context, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+		var orchestrator = await SetupOrchestrator();
+		orchestrator.SetTime(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+		var cmd = orchestrator.GetCommand<SetBirthdayCommand>();
 
 		// Act
-		await cmd.Object.SetBirthday((Month) context.Month, context.Day, context.Year, context.TimeZone);
+		await cmd.Object.SetBirthday((Month) date.Month, date.Day, date.Year);
 
 		// Assert
-		var date = context.ToDateTime();
+		orchestrator.Actor.RoleIds.Should().Contain(orchestrator.Configuration.BirthdayConfig.BirthdayRole);
 
-		context.User.RoleIds.Should().Contain(cfg.BirthdayConfig.BirthdayRole);
-
-		var ddbUser = await ddb.GetUserAsync(context.UserID.ID);
+		var ddbUser = await orchestrator.Database.GetUserAsync(orchestrator.Actor.Id);
 		ddbUser!.Data.Birthday.Should().NotBeNull();
 		ddbUser.Data.Birthday.Birthdate.UtcDateTime.Should().Be(date.UtcDateTime);
 		ddbUser.Data.Birthdate.Should().Be(date.UtcDateTime.ToString("MMddHHmm"));
 
 		ddbUser.Data.AutoMemberHoldRecord.Should().BeNull();
 
-		TestUtilities.VerifyMessage(cmd, Strings.Command_SetBirthday_Success, true);
+		cmd.VerifyResponse(Strings.Command_SetBirthday_Success, true);
 
-		var birthdayAnnounceChannel = cmd.Object.Context.Guild.GetTextChannel(cfg.BirthdayConfig.BirthdayAnnounceChannel);
+		var birthdayAnnounceChannel = cmd.Object.Context.Guild.GetTextChannel(orchestrator.Configuration.BirthdayConfig.BirthdayAnnounceChannel);
 		birthdayAnnounceChannel.Should().NotBeNull();
-		
-		TestUtilities.VerifyChannelMessage(context.BirthdayAnnounceChannel, Strings.Birthday_Announcement);
+
+		orchestrator.GetChannel(orchestrator.Configuration.BirthdayConfig.BirthdayAnnounceChannel)
+			.VerifyMessage(Strings.Birthday_Announcement);
 	}
-
-	private record SetBirthdayContext(Snowflake UserID, int Year, int Month, int Day, int TimeZone = 0)
-    {
-        public DateTimeOffset ToDateTime()
-        {
-            var unspecifiedDate = new DateTime(Year, Month, Day, 0, 0, 0, DateTimeKind.Unspecified);
-            var timeZone = new DateTimeOffset(unspecifiedDate, TimeSpan.FromHours(TimeZone));
-
-            return timeZone;
-		}
-
-		public Mock<ITextChannel> StaffAnnounceChannel { get; set; }
-		public IGuildUser User { get; set; }
-		public Mock<ITextChannel> BirthdayAnnounceChannel { get ; set ; }
-    }
 }

@@ -1,31 +1,32 @@
 using System.Diagnostics.CodeAnalysis;
 using Discord;
+using InstarBot.Tests;
 using Moq;
+using PaxAndromeda.Instar;
 
 #pragma warning disable CS8625
 
-namespace InstarBot.Tests.Models;
+namespace InstarBot.Test.Framework.Models;
 
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 [SuppressMessage("ReSharper", "AutoPropertyCanBeMadeGetOnly.Global")]
-public  class TestGuildUser : IGuildUser
+public class TestGuildUser : TestUser, IMockOf<IGuildUser>, IGuildUser
 {
-    private readonly List<ulong> _roleIds = [ ];
+	public Mock<IGuildUser> Mock { get; } = new();
 
-    public ulong Id { get; init; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public string Mention { get; set; } = null!;
-    public UserStatus Status { get; set; }
-    public IReadOnlyCollection<ClientType> ActiveClients { get; set; } = null!;
-    public IReadOnlyCollection<IActivity> Activities { get; set; } = null!;
-    public string AvatarId { get; set; } = null!;
-    public string Discriminator { get; set; } = null!;
-    public ushort DiscriminatorValue { get; set; }
-    public bool IsBot { get; set; }
-    public bool IsWebhook { get; set; }
-    public string Username { get; set; } = null!;
-    public UserProperties? PublicFlags { get; set; }
-    public bool IsDeafened { get; set; }
+    private HashSet<ulong> _roleIds = [ ];
+
+	public TestGuildUser() : this(Snowflake.Generate(), [ ]) { }
+
+	public TestGuildUser(Snowflake snowflake) : this(snowflake, [ ])
+	{ }
+
+	public TestGuildUser(Snowflake snowflake, IEnumerable<Snowflake> roles) : base(snowflake)
+	{
+		_roleIds = roles.Select(n => n.ID).ToHashSet();
+	}
+
+	public bool IsDeafened { get; set; }
     public bool IsMuted { get; set; }
     public bool IsSelfDeafened { get; set; }
     public bool IsSelfMuted { get; set; }
@@ -36,49 +37,32 @@ public  class TestGuildUser : IGuildUser
     public bool IsVideoing { get; set; }
     public DateTimeOffset? RequestToSpeakTimestamp { get; set; }
 
-	private readonly Mock<IDMChannel> _dmChannelMock = new();
+	public ChannelPermissions GetPermissions(IGuildChannel channel)
+	{
+		return Mock.Object.GetPermissions(channel);
+	}
 
-	public string GetAvatarUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
-    {
-        return string.Empty;
-    }
+	public string GetGuildAvatarUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
+	{
+		return Mock.Object.GetGuildAvatarUrl(format, size);
+	}
 
-    public string GetDefaultAvatarUrl()
-    {
-        return string.Empty;
-    }
+	public string GetGuildBannerUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
+	{
+		return Mock.Object.GetGuildBannerUrl(format, size);
+	}
 
-    public Task<IDMChannel> CreateDMChannelAsync(RequestOptions options = null!)
-    {
-		return Task.FromResult(_dmChannelMock.Object);
-    }
+	public Task KickAsync(string reason = null, RequestOptions options = null)
+	{
+		return Mock.Object.KickAsync(reason, options);
+	}
 
-    public ChannelPermissions GetPermissions(IGuildChannel channel)
-    {
-        throw new NotImplementedException();
-    }
+	public Task ModifyAsync(Action<GuildUserProperties> func, RequestOptions options = null)
+	{
+		return Mock.Object.ModifyAsync(func, options);
+	}
 
-    public string GetGuildAvatarUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
-    {
-        throw new NotImplementedException();
-    }
-
-    public string GetDisplayAvatarUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task KickAsync(string reason = null, RequestOptions options = null!)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task ModifyAsync(Action<GuildUserProperties> func, RequestOptions options = null)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task AddRoleAsync(ulong roleId, RequestOptions options = null)
+	public Task AddRoleAsync(ulong roleId, RequestOptions options = null)
     {
         Changed = true;
         _roleIds.Add(roleId);
@@ -95,14 +79,18 @@ public  class TestGuildUser : IGuildUser
     public Task AddRolesAsync(IEnumerable<ulong> roleIds, RequestOptions options = null)
     {
         Changed = true;
-        _roleIds.AddRange(roleIds);
+		foreach (var id in roleIds)
+			_roleIds.Add(id);
+		
         return Task.CompletedTask;
     }
 
     public Task AddRolesAsync(IEnumerable<IRole> roles, RequestOptions options = null)
     {
         Changed = true;
-        _roleIds.AddRange(roles.Select(role => role.Id));
+		foreach (var role in roles)
+			_roleIds.Add(role.Id);
+
         return Task.CompletedTask;
     }
 
@@ -137,22 +125,12 @@ public  class TestGuildUser : IGuildUser
 
     public Task SetTimeOutAsync(TimeSpan span, RequestOptions options = null)
     {
-        throw new NotImplementedException();
+	    return Mock.Object.SetTimeOutAsync(span, options);
     }
 
     public Task RemoveTimeOutAsync(RequestOptions options = null)
     {
-        throw new NotImplementedException();
-    }
-
-    public string GetGuildBannerUrl(ImageFormat format = ImageFormat.Auto, ushort size = 128)
-    {
-        throw new NotImplementedException();
-    }
-
-    public string GetAvatarDecorationUrl()
-    {
-        throw new NotImplementedException();
+	    return Mock.Object.RemoveTimeOutAsync(options);
     }
 
     public DateTimeOffset? JoinedAt { get; init; }
@@ -162,14 +140,14 @@ public  class TestGuildUser : IGuildUser
     public string GuildAvatarId { get; set; } = null!;
     public GuildPermissions GuildPermissions { get; set; }
     public IGuild Guild { get; set; } = null!;
-	public ulong GuildId => TestUtilities.GuildID;
+	public ulong GuildId { get; internal set; } = 0;
     public DateTimeOffset? PremiumSince { get; set; }
 
     public IReadOnlyCollection<ulong> RoleIds
-    {
-        get => _roleIds.AsReadOnly();
-        init => _roleIds = value.ToList();
-    }
+	{
+		get => _roleIds.AsReadOnly();
+		set => _roleIds = new HashSet<ulong>(value);
+	}
 
     public bool? IsPending { get; set; }
     public int Hierarchy { get; set; }
@@ -183,15 +161,13 @@ public  class TestGuildUser : IGuildUser
 
     public string GuildBannerHash { get; set; } = null!;
 
-	public string GlobalName { get; set; } = null!;
-
-	public string AvatarDecorationHash { get; set; } = null!;
-
-	public ulong? AvatarDecorationSkuId { get; set; } = null!;
-	public PrimaryGuild? PrimaryGuild { get; set; } = null!;
-
-	public TestGuildUser Clone()
-	{
+    public TestGuildUser Clone()
+    {
 		return (TestGuildUser) MemberwiseClone();
-	}
+    }
+
+    public void Reset()
+    {
+		Changed = false;
+    }
 }

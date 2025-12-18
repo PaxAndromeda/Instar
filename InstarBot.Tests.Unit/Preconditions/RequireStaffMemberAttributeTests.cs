@@ -1,12 +1,12 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Discord;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Preconditions;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using InstarBot.Test.Framework;
 using Xunit;
 
 namespace InstarBot.Tests.Preconditions;
@@ -23,13 +23,14 @@ public sealed class RequireStaffMemberAttributeTests
             .AddInMemoryCollection(new Dictionary<string, string?>())
             .Build());
 
-        var context = TestUtilities.SetupContext(new TestContext
-        {
-            UserRoles = [new Snowflake(793607635608928257)]
-        });
+		var orchestrator = TestOrchestrator.Default;
+		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.StaffRoleID);
 
-        // Act
-        var result = await attr.CheckRequirementsAsync(context.Object, null!, serviceColl.BuildServiceProvider());
+		var context = new Mock<IInteractionContext>();
+		context.Setup(n => n.User).Returns(orchestrator.Subject);
+
+		// Act
+		var result = await attr.CheckRequirementsAsync(context.Object, null!, serviceColl.BuildServiceProvider());
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -41,11 +42,13 @@ public sealed class RequireStaffMemberAttributeTests
         // Arrange
         var attr = new RequireStaffMemberAttribute();
 
-        var context = new Mock<IInteractionContext>();
+		var orchestrator = TestOrchestrator.Default;
+
+		var context = new Mock<IInteractionContext>();
         context.Setup(n => n.User).Returns(Mock.Of<IUser>());
 
         // Act
-        var result = await attr.CheckRequirementsAsync(context.Object, null!, TestUtilities.GetServices());
+        var result = await attr.CheckRequirementsAsync(context.Object, null!, orchestrator.ServiceProvider);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -57,13 +60,14 @@ public sealed class RequireStaffMemberAttributeTests
         // Arrange
         var attr = new RequireStaffMemberAttribute();
 
-        var context = TestUtilities.SetupContext(new TestContext
-        {
-            UserRoles = [new Snowflake(793607635608928257)]
-        });
+		var orchestrator = TestOrchestrator.Default;
+		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.StaffRoleID);
 
-        // Act
-        var result = await attr.CheckRequirementsAsync(context.Object, null!, TestUtilities.GetServices());
+		var context = new Mock<IInteractionContext>();
+		context.Setup(n => n.User).Returns(orchestrator.Subject);
+
+		// Act
+		var result = await attr.CheckRequirementsAsync(context.Object, null!, orchestrator.ServiceProvider);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -74,14 +78,15 @@ public sealed class RequireStaffMemberAttributeTests
     {
         // Arrange
         var attr = new RequireStaffMemberAttribute();
+        
+		var orchestrator = TestOrchestrator.Default;
+		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
 
-        var context = TestUtilities.SetupContext(new TestContext
-        {
-            UserRoles = [new Snowflake()]
-        });
+		var context = new Mock<IInteractionContext>();
+		context.Setup(n => n.User).Returns(orchestrator.Subject);
 
-        // Act
-        var result = await attr.CheckRequirementsAsync(context.Object, null!, TestUtilities.GetServices());
+		// Act
+		var result = await attr.CheckRequirementsAsync(context.Object, null!, orchestrator.ServiceProvider);
 
         // Assert
         result.IsSuccess.Should().BeFalse();

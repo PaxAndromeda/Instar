@@ -1,4 +1,5 @@
-﻿using Discord;
+﻿using System.Diagnostics.CodeAnalysis;
+using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using JetBrains.Annotations;
@@ -8,13 +9,12 @@ using PaxAndromeda.Instar.Embeds;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 using Serilog;
-using System.Diagnostics.CodeAnalysis;
 
 namespace PaxAndromeda.Instar.Commands;
 
 // Required to be unsealed for mocking
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class SetBirthdayCommand(IInstarDDBService ddbService, IDynamicConfigService dynamicConfig, IMetricService metricService, IBirthdaySystem birthdaySystem, TimeProvider timeProvider) : BaseCommand
+public class SetBirthdayCommand(IDatabaseService ddbService, IDynamicConfigService dynamicConfig, IMetricService metricService, IBirthdaySystem birthdaySystem, TimeProvider timeProvider) : BaseCommand
 {
 	/// <summary>
 	/// The default year to use when none is provided. We select a year that is sufficiently
@@ -123,7 +123,7 @@ public class SetBirthdayCommand(IInstarDDBService ddbService, IDynamicConfigServ
 				};
 			}
 
-			await dbUser.UpdateAsync();
+			await dbUser.CommitAsync();
 			
             Log.Information("User {UserID} birthday set to {DateTime} (UTC time calculated as {UtcTime})",
                 Context.User!.Id,

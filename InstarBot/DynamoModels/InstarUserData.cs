@@ -243,7 +243,7 @@ public class InstarEnumPropertyConverter<T> : IPropertyConverter where T : Enum
 {
     public DynamoDBEntry ToEntry(object value)
     {
-        var pos = (InstarUserPosition) value;
+        var pos = (T) value;
 
         var name = pos.GetAttributeOfType<EnumMemberAttribute>();
         return name?.Value ?? "UNKNOWN";
@@ -253,7 +253,7 @@ public class InstarEnumPropertyConverter<T> : IPropertyConverter where T : Enum
     {
         var sEntry = entry.AsString();
         if (sEntry is null || string.IsNullOrWhiteSpace(entry.AsString()))
-            return InstarUserPosition.Unknown;
+            return null;
             
         var name = Utilities.ToEnum<T>(sEntry);
         

@@ -1,6 +1,8 @@
-﻿using Discord;
+﻿using Amazon.SimpleSystemsManagement.Model;
+using Discord;
 using FluentAssertions;
-using InstarBot.Tests.Services;
+using InstarBot.Test.Framework;
+using InstarBot.Test.Framework.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using PaxAndromeda.Instar;
@@ -15,119 +17,110 @@ namespace InstarBot.Tests.Integration.Interactions;
 
 public static class ResetBirthdayCommandTests
 {
-	private static async Task<(IInstarDDBService, Mock<ResetBirthdayCommand>, IGuildUser, TestContext, InstarDynamicConfiguration cfg)> SetupMocks(Birthday? userBirthday = null, bool throwError = false, bool skipDbInsert = false)
+	private static async Task<TestOrchestrator> SetupOrchestrator(DateTimeOffset? userBirthday = null, bool throwsError = false)
 	{
-		TestUtilities.SetupLogging();
+		var orchestrator = TestOrchestrator.Default;
 
-		var ddbService = TestUtilities.GetServices().GetService<IInstarDDBService>();
-		var cfgService = TestUtilities.GetDynamicConfiguration();
-		var cfg = await cfgService.GetConfig();
-		var userId = Snowflake.Generate();
+		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
 
-		if (throwError && ddbService is MockInstarDDBService mockDDB)
+		if (throwsError && orchestrator.Database is TestDatabaseService tds)
 		{
-			mockDDB.Setup(n => n.GetUserAsync(It.IsAny<Snowflake>())).Throws<BadStateException>();
+			tds.Mock.Setup(n => n.GetUserAsync(It.IsAny<Snowflake>())).Throws<BadStateException>();
 
 			// assert that we're actually throwing an exception
-			await Assert.ThrowsAsync<BadStateException>(async () => await ddbService.GetUserAsync(userId));
+			await Assert.ThrowsAsync<BadStateException>(async () => await tds.GetUserAsync(orchestrator.Actor.Id));
 		}
 
-		var testContext = new TestContext
-		{
-			UserID = userId
-		};
+		orchestrator.Subject = orchestrator.CreateUser();
+		if (userBirthday is null) 
+			return orchestrator;
 
-		var cmd = TestUtilities.SetupCommandMock(() => new ResetBirthdayCommand(ddbService!, cfgService), testContext);
+		var dbEntry = InstarUserData.CreateFrom(orchestrator.Subject);
+		dbEntry.Birthday = new Birthday((DateTimeOffset) userBirthday, orchestrator.TimeProvider);
+		dbEntry.Birthdate = dbEntry.Birthday.Key;
 
-		await cmd.Object.Context.User!.AddRoleAsync(cfg.NewMemberRoleID);
+		await orchestrator.Database.CreateUserAsync(dbEntry);
 
-		cmd.Setup(n => n.Context.User!.GuildId).Returns(TestUtilities.GuildID);
-
-		if (!skipDbInsert)
-			((MockInstarDDBService) ddbService!).Register(InstarUserData.CreateFrom(cmd.Object.Context.User!));
-
-		ddbService.Should().NotBeNull();
-
-		if (userBirthday is null)
-			return (ddbService, cmd, cmd.Object.Context.User!, testContext, cfg);
-
-		var dbUser = await ddbService.GetUserAsync(userId);
-		dbUser!.Data.Birthday = userBirthday;
-		dbUser.Data.Birthdate = userBirthday.Key;
-		await dbUser.UpdateAsync();
-
-		return (ddbService, cmd, cmd.Object.Context.User!, testContext, cfg);
+		return orchestrator;
 	}
 
 	[Fact]
 	public static async Task ResetBirthday_WithEligibleUser_ShouldHaveBirthdayReset()
 	{
 		// Arrange
-		var (ddb, cmd, user, ctx, _) = await SetupMocks(userBirthday: new Birthday(new DateTime(2000, 1, 1), TimeProvider.System));
+		var orchestrator = await SetupOrchestrator(new DateTime(2000, 1, 1));
+		var cmd = orchestrator.GetCommand<ResetBirthdayCommand>();
+
 
 		// Act
-		await cmd.Object.ResetBirthday(user);
+		await cmd.Object.ResetBirthday(orchestrator.Subject);
 
 		// Assert
-		var dbUser = await ddb.GetUserAsync(user.Id);
+		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
 		dbUser.Should().NotBeNull();
 		dbUser.Data.Birthday.Should().BeNull();
 		dbUser.Data.Birthdate.Should().BeNull();
 
-		TestUtilities.VerifyMessage(cmd, Strings.Command_ResetBirthday_Success, ephemeral: true);
-		TestUtilities.VerifyChannelMessage(ctx.DMChannelMock, Strings.Command_ResetBirthday_EndUserNotification);
+		cmd.VerifyResponse(Strings.Command_ResetBirthday_Success, ephemeral: true);
+		orchestrator.Subject.DMChannelMock.VerifyMessage(Strings.Command_ResetBirthday_EndUserNotification);
 	}
 
 	[Fact]
 	public static async Task ResetBirthday_UserNotFound_ShouldEmitError()
 	{
 		// Arrange
-		var (ddb, cmd, user, ctx, _) = await SetupMocks(skipDbInsert: true);
+		var orchestrator = await SetupOrchestrator();
+		var cmd = orchestrator.GetCommand<ResetBirthdayCommand>();
 
 		// Act
-		await cmd.Object.ResetBirthday(user);
+		await cmd.Object.ResetBirthday(orchestrator.Subject);
 
 		// Assert
-		var dbUser = await ddb.GetUserAsync(user.Id);
+		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
 		dbUser.Should().BeNull();
 
-		TestUtilities.VerifyMessage(cmd, Strings.Command_ResetBirthday_Error_UserNotFound, ephemeral: true);
+		cmd.VerifyResponse(Strings.Command_ResetBirthday_Error_UserNotFound, ephemeral: true);
 	}
 
 	[Fact]
 	public static async Task ResetBirthday_UserHasBirthdayRole_ShouldRemoveRole()
 	{
 		// Arrange
-		var (ddb, cmd, user, ctx, cfg) = await SetupMocks(userBirthday: new Birthday(new DateTime(2000, 1, 1), TimeProvider.System));
+		var orchestrator = await SetupOrchestrator(new DateTime(2000, 1, 1));
+		var birthdayRole = orchestrator.Configuration.BirthdayConfig.BirthdayRole;
 
-		await user.AddRoleAsync(cfg.BirthdayConfig.BirthdayRole);
-		user.RoleIds.Should().Contain(cfg.BirthdayConfig.BirthdayRole);
+		var cmd = orchestrator.GetCommand<ResetBirthdayCommand>();
+
+		await orchestrator.Subject.AddRoleAsync(birthdayRole);
+
+		orchestrator.Subject.RoleIds.Should().Contain(birthdayRole);
 
 		// Act
-		await cmd.Object.ResetBirthday(user);
+		await cmd.Object.ResetBirthday(orchestrator.Subject);
 
 		// Assert
-		var dbUser = await ddb.GetUserAsync(user.Id);
+		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
 		dbUser.Should().NotBeNull();
 		dbUser.Data.Birthday.Should().BeNull();
 		dbUser.Data.Birthdate.Should().BeNull();
 
-		user.RoleIds.Should().NotContain(cfg.BirthdayConfig.BirthdayRole);
+		orchestrator.Subject.RoleIds.Should().NotContain(birthdayRole);
 
-		TestUtilities.VerifyMessage(cmd, Strings.Command_ResetBirthday_Success, ephemeral: true);
-		TestUtilities.VerifyChannelMessage(ctx.DMChannelMock, Strings.Command_ResetBirthday_EndUserNotification);
+		cmd.VerifyResponse(Strings.Command_ResetBirthday_Success, ephemeral: true);
+		orchestrator.Subject.DMChannelMock.VerifyMessage(Strings.Command_ResetBirthday_EndUserNotification);
 	}
 
 	[Fact]
 	public static async Task ResetBirthday_WithDBError_ShouldEmitError()
 	{
 		// Arrange
-		var (ddb, cmd, user, ctx, _) = await SetupMocks(throwError: true);
+		var orchestrator = await SetupOrchestrator(throwsError: true);
+		var cmd = orchestrator.GetCommand<ResetBirthdayCommand>();
 
 		// Act
-		await cmd.Object.ResetBirthday(user);
+		await cmd.Object.ResetBirthday(orchestrator.Subject);
 
 		// Assert
-		TestUtilities.VerifyMessage(cmd, Strings.Command_ResetBirthday_Error_Unknown, ephemeral: true);
+		cmd.VerifyResponse(Strings.Command_ResetBirthday_Error_Unknown, ephemeral: true);
 	}
 }

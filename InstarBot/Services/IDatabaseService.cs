@@ -5,7 +5,7 @@ using PaxAndromeda.Instar.DynamoModels;
 namespace PaxAndromeda.Instar.Services;
 
 [SuppressMessage("ReSharper", "UnusedMemberInSuper.Global")]
-public interface IInstarDDBService
+public interface IDatabaseService
 {
     /// <summary>
     /// Retrieves user data from DynamoDB for a provided <paramref name="snowflake"/>.
@@ -14,19 +14,19 @@ public interface IInstarDDBService
     /// <returns>User data associated with the provided <paramref name="snowflake"/>, if any exists</returns>
     /// <exception cref="ArgumentException">If the `position` entry does not represent a valid <see cref="InstarUserPosition"/></exception>
     Task<InstarDatabaseEntry<InstarUserData>?> GetUserAsync(Snowflake snowflake);
-    
-    
-    /// <summary>
-    /// Retrieves or creates user data from a provided <paramref name="user"/>.
-    /// </summary>
-    /// <param name="user">An instance of <see cref="IGuildUser"/>. If a new user must be created,
-    /// information will be pulled from the <paramref name="user"/> parameter.</param>
-    /// <returns>An instance of <see cref="InstarDatabaseEntry{T}"/>.</returns>
-    /// <remarks>
-    ///     When a new user is created with this method, it is *not* created in DynamoDB until
-    ///     <see cref="InstarDatabaseEntry{T}.UpdateAsync"/> is called.
-    /// </remarks>
-    Task<InstarDatabaseEntry<InstarUserData>> GetOrCreateUserAsync(IGuildUser user);
+
+
+	/// <summary>
+	/// Retrieves or creates user data from a provided <paramref name="user"/>.
+	/// </summary>
+	/// <param name="user">An instance of <see cref="IGuildUser"/>. If a new user must be created,
+	/// information will be pulled from the <paramref name="user"/> parameter.</param>
+	/// <returns>An instance of <see cref="InstarDatabaseEntry{T}"/>.</returns>
+	/// <remarks>
+	///     When a new user is created with this method, it is *not* created in DynamoDB until
+	///     <see cref="InstarDatabaseEntry{T}.CommitAsync"/> is called.
+	/// </remarks>
+	Task<InstarDatabaseEntry<InstarUserData>> GetOrCreateUserAsync(IGuildUser user);
 
     /// <summary>
     /// Retrieves a list of user data from a list of <paramref name="snowflakes"/>.
@@ -55,4 +55,18 @@ public interface IInstarDDBService
 	/// cref="InstarDatabaseEntry{InstarUserData}"/> objects for users whose birthdays fall within the specified range.
 	/// Returns an empty list if no users are found.</returns>
 	Task<List<InstarDatabaseEntry<InstarUserData>>> GetUsersByBirthday(DateTimeOffset birthdate, TimeSpan fuzziness);
+
+	// TODO: documentation
+	Task<List<InstarDatabaseEntry<Notification>>> GetPendingNotifications();
+
+	/// <summary>
+	/// Creates a new database representation from a provided <paramref name="user"/>.
+	/// </summary>
+	/// <param name="notification">An instance of <see cref="Notification"/>.</param>
+	/// <returns>An instance of <see cref="InstarDatabaseEntry{Notification}"/>.</returns>
+	/// <remarks>
+	///     When a new user is created with this method, it is *not* created in DynamoDB until
+	///     <see cref="InstarDatabaseEntry{Notification}.CommitAsync"/> is called.
+	/// </remarks>
+	Task<InstarDatabaseEntry<Notification>> CreateNotificationAsync(Notification notification);
 }

@@ -7,7 +7,7 @@ using Serilog;
 
 namespace PaxAndromeda.Instar.Commands;
 
-public class ResetBirthdayCommand(IInstarDDBService ddbService, IDynamicConfigService dynamicConfig) : BaseCommand
+public class ResetBirthdayCommand(IDatabaseService ddbService, IDynamicConfigService dynamicConfig) : BaseCommand
 {
 	/*
 	 * Concern: This command runs very slowly, and might end up hitting the 3-second limit from Discord.
@@ -33,7 +33,7 @@ public class ResetBirthdayCommand(IInstarDDBService ddbService, IDynamicConfigSe
 
 			dbUser.Data.Birthday = null;
 			dbUser.Data.Birthdate = null;
-			await dbUser.UpdateAsync();
+			await dbUser.CommitAsync();
 
 			if (user is IGuildUser guildUser)
 			{

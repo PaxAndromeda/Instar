@@ -1,14 +1,17 @@
 using System.Diagnostics.CodeAnalysis;
 using Discord;
+using Moq;
 using PaxAndromeda.Instar;
 
 #pragma warning disable CS8625
 
-namespace InstarBot.Tests.Models;
+namespace InstarBot.Test.Framework.Models;
 
 [SuppressMessage("ReSharper", "AutoPropertyCanBeMadeGetOnly.Global")]
-public sealed class TestRole : IRole
+public sealed class TestRole : IMockOf<IRole>, IRole
 {
+	public Mock<IRole> Mock { get; } = new();
+
     internal TestRole(Snowflake snowflake)
     {
         Id = snowflake;
@@ -18,29 +21,20 @@ public sealed class TestRole : IRole
     public ulong Id { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
-    public Task DeleteAsync(RequestOptions options = null)
-    {
-        throw new NotImplementedException();
-    }
-
     public string Mention { get; set; } = null!;
 
-    public int CompareTo(IRole? other)
+	public int CompareTo(IRole? other)
     {
-        throw new NotImplementedException();
-    }
+		return Comparer<IRole>.Default.Compare(this, other);
+	}
 
-    public Task ModifyAsync(Action<RoleProperties> func, RequestOptions options = null)
-    {
-        throw new NotImplementedException();
-    }
+	public Task DeleteAsync(RequestOptions options = null) => Mock.Object.DeleteAsync(options);
 
-    public string GetIconUrl()
-    {
-        throw new NotImplementedException();
-    }
+	public Task ModifyAsync(Action<RoleProperties> func, RequestOptions options = null) => Mock.Object.ModifyAsync(func, options);
 
-    public IGuild Guild { get; set; } = null!;
+	public string GetIconUrl() => Mock.Object.GetIconUrl();
+
+	public IGuild Guild { get; set; } = null!;
     public Color Color { get; set; } = default!;
     public bool IsHoisted { get; set; } = false;
     public bool IsManaged { get; set; } = false;
