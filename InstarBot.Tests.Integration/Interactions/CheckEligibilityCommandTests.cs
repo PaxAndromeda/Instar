@@ -1,12 +1,13 @@
 ﻿using Discord;
 using FluentAssertions;
-using InstarBot.Tests.Models;
-using InstarBot.Tests.Services;
+using InstarBot.Test.Framework;
+using InstarBot.Test.Framework.Services;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.DynamoModels;
+using PaxAndromeda.Instar.Services;
 using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
@@ -16,53 +17,28 @@ public static class CheckEligibilityCommandTests
 	private const ulong MemberRole = 793611808372031499ul;
 	private const ulong NewMemberRole = 796052052433698817ul;
 
-	private static async Task<Mock<CheckEligibilityCommand>> SetupCommandMock(CheckEligibilityCommandTestContext context, Action<Mock<MockInstarDDBService>>? setupMocks = null)
+	private static async Task<TestOrchestrator> SetupOrchestrator(MembershipEligibility eligibility)
 	{
-		TestUtilities.SetupLogging();
+		var orchestrator = TestOrchestrator.Default;
 
-		var mockAMS = new Mock<MockAutoMemberSystem>();
-		mockAMS.Setup(n => n.CheckEligibility(It.IsAny<InstarDynamicConfiguration>(), It.IsAny<IGuildUser>())).Returns(context.Eligibility);
+		TestAutoMemberSystem tams = (TestAutoMemberSystem) orchestrator.GetService<IAutoMemberSystem>();
+		tams.Mock.Setup(n => n.CheckEligibility(It.IsAny<InstarDynamicConfiguration>(), It.IsAny<IGuildUser>())).Returns(eligibility);
 
-		var userId = Snowflake.Generate();
-
-		var mockDDB = new MockInstarDDBService();
-		var user = new TestGuildUser
+		/*if (context.IsAMH)
 		{
-			Id = userId,
-			Username = "username",
-			JoinedAt = DateTimeOffset.Now,
-			RoleIds = context.Roles
-		};
-
-		await mockDDB.CreateUserAsync(InstarUserData.CreateFrom(user));
-
-		if (context.IsAMH)
-		{
-			var ddbUser = await mockDDB.GetUserAsync(userId);
-
-			ddbUser.Should().NotBeNull();
-			ddbUser.Data.AutoMemberHoldRecord = new AutoMemberHoldRecord
+			var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Actor.Id);
+			dbUser.Should().NotBeNull();
+			dbUser.Data.AutoMemberHoldRecord = new AutoMemberHoldRecord
 			{
 				Date = DateTime.UtcNow,
 				ModeratorID = Snowflake.Generate(),
 				Reason = "Testing"
 			};
 
-			await ddbUser.UpdateAsync();
-		}
+			await dbUser.CommitAsync();
+		}*/
 
-		var commandMock = TestUtilities.SetupCommandMock(
-			() => new CheckEligibilityCommand(TestUtilities.GetDynamicConfiguration(), mockAMS.Object, mockDDB, new MockMetricService()),
-			new TestContext
-			{
-				UserID = userId,
-				UserRoles = context.Roles.Select(n => new Snowflake(n)).ToHashSet()
-			});
-
-		context.DDB = mockDDB;
-		context.User = user;
-
-		return commandMock;
+		return orchestrator;
 	}
 
 	private static EmbedVerifier.VerifierBuilder CreateVerifier()
@@ -77,28 +53,30 @@ public static class CheckEligibilityCommandTests
 	public static async Task CheckEligibilityCommand_WithExistingMember_ShouldEmitValidMessage()
 	{
 		// Arrange
-		var ctx = new CheckEligibilityCommandTestContext(false, [ MemberRole ], MembershipEligibility.Eligible);
-		var mock = await SetupCommandMock(ctx);
+		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
+
+		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.MemberRoleID);
 
 		// Act
-		await mock.Object.CheckEligibility();
+		await cmd.Object.CheckEligibility();
 
 		// Assert
-		TestUtilities.VerifyMessage(mock, Strings.Command_CheckEligibility_Error_AlreadyMember, true);
+		cmd.VerifyResponse(Strings.Command_CheckEligibility_Error_AlreadyMember, ephemeral: true);
 	}
 
 	[Fact]
 	public static async Task CheckEligibilityCommand_NoMemberRoles_ShouldEmitValidErrorMessage()
 	{
 		// Arrange
-		var ctx = new CheckEligibilityCommandTestContext(false, [], MembershipEligibility.Eligible);
-		var mock = await SetupCommandMock(ctx);
+		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		// Act
-		await mock.Object.CheckEligibility();
+		await cmd.Object.CheckEligibility();
 
 		// Assert
-		TestUtilities.VerifyMessage(mock, Strings.Command_CheckEligibility_Error_NoMemberRoles, true);
+		cmd.VerifyResponse(Strings.Command_CheckEligibility_Error_NoMemberRoles, ephemeral: true);
 	}
 
 	[Fact]
@@ -110,19 +88,16 @@ public static class CheckEligibilityCommandTests
 			.WithDescription(Strings.Command_CheckEligibility_MessagesEligibility)
 			.Build();
 
-		var ctx = new CheckEligibilityCommandTestContext(
-			false,
-			[ NewMemberRole ],
-			MembershipEligibility.Eligible);
+		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
-
-		var mock = await SetupCommandMock(ctx);
+		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
 
 		// Act
-		await mock.Object.CheckEligibility();
+		await cmd.Object.CheckEligibility();
 
 		// Assert
-		TestUtilities.VerifyEmbed(mock, verifier, ephemeral: true);
+		cmd.VerifyResponse(verifier, ephemeral: true);
 	}
 
 	[Fact]
@@ -136,20 +111,29 @@ public static class CheckEligibilityCommandTests
 			.WithField(Strings.Command_CheckEligibility_AMH_WhatToDo)
 			.WithField(Strings.Command_CheckEligibility_AMH_ContactStaff)
 			.Build();
+		
+		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
-		var ctx = new CheckEligibilityCommandTestContext(
-			true,
-			[ NewMemberRole ],
-			MembershipEligibility.Eligible);
+		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
 
+		// Give an AMH
+		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Actor.Id);
+		dbUser.Should().NotBeNull();
+		dbUser.Data.AutoMemberHoldRecord = new AutoMemberHoldRecord
+		{
+			Date = DateTime.UtcNow,
+			ModeratorID = Snowflake.Generate(),
+			Reason = "Testing"
+		};
 
-		var mock = await SetupCommandMock(ctx);
+		await dbUser.CommitAsync();
 
 		// Act
-		await mock.Object.CheckEligibility();
+		await cmd.Object.CheckEligibility();
 
 		// Assert
-		TestUtilities.VerifyEmbed(mock, verifier, ephemeral: true);
+		cmd.VerifyResponse(verifier, ephemeral: true);
 	}
 
 	[Fact]
@@ -161,20 +145,21 @@ public static class CheckEligibilityCommandTests
 			.WithDescription(Strings.Command_CheckEligibility_MessagesEligibility)
 			.Build();
 
-		var ctx = new CheckEligibilityCommandTestContext(
-			true,
-			[ NewMemberRole ],
-			MembershipEligibility.Eligible);
+		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
-		var mock = await SetupCommandMock(ctx);
+		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
 
-		ctx.DDB.Setup(n => n.GetUserAsync(It.IsAny<Snowflake>())).Throws<BadStateException>();
+		if (orchestrator.Database is not IMockOf<IDatabaseService> dbMock)
+			throw new InvalidOperationException("This test depends on the registered database implementing IMockOf<IDatabaseService>");
+
+		dbMock.Mock.Setup(n => n.GetUserAsync(It.IsAny<Snowflake>())).Throws<BadStateException>();
 
 		// Act
-		await mock.Object.CheckEligibility();
+		await cmd.Object.CheckEligibility();
 
 		// Assert
-		TestUtilities.VerifyEmbed(mock, verifier, ephemeral: true);
+		cmd.VerifyResponse(verifier, ephemeral: true);
 	}
 
 	[Theory]
@@ -190,7 +175,7 @@ public static class CheckEligibilityCommandTests
 		{
 			{ MembershipEligibility.MissingRoles,        Strings.Command_CheckEligibility_MessagesEligibility },
 			{ MembershipEligibility.MissingIntroduction, Strings.Command_CheckEligibility_IntroductionEligibility },
-			{ MembershipEligibility.InadequateTenure,            Strings.Command_CheckEligibility_JoinAgeEligibility },
+			{ MembershipEligibility.InadequateTenure,    Strings.Command_CheckEligibility_JoinAgeEligibility },
 			{ MembershipEligibility.PunishmentReceived,  Strings.Command_CheckEligibility_ModActionsEligibility },
 			{ MembershipEligibility.NotEnoughMessages,   Strings.Command_CheckEligibility_MessagesEligibility },
 		};
@@ -199,7 +184,7 @@ public static class CheckEligibilityCommandTests
 		{
 			{ MembershipEligibility.MissingRoles,        Strings.Command_CheckEligibility_MissingItem_Role },
 			{ MembershipEligibility.MissingIntroduction, Strings.Command_CheckEligibility_MissingItem_Introduction },
-			{ MembershipEligibility.InadequateTenure,            Strings.Command_CheckEligibility_MissingItem_TooYoung },
+			{ MembershipEligibility.InadequateTenure,    Strings.Command_CheckEligibility_MissingItem_TooYoung },
 			{ MembershipEligibility.PunishmentReceived,  Strings.Command_CheckEligibility_MissingItem_PunishmentReceived },
 			{ MembershipEligibility.NotEnoughMessages,   Strings.Command_CheckEligibility_MissingItem_Messages },
 		};
@@ -214,114 +199,118 @@ public static class CheckEligibilityCommandTests
 			.WithField(testFieldMap, true)
 			.Build();
 
-		var ctx = new CheckEligibilityCommandTestContext(
-			false,
-			[ NewMemberRole ], 
-			eligibility);
+		var orchestrator = await SetupOrchestrator(eligibility);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
-		var mock = await SetupCommandMock(ctx);
+		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
 
 		// Act
-		await mock.Object.CheckEligibility();
+		await cmd.Object.CheckEligibility();
 
 		// Assert
-		TestUtilities.VerifyEmbed(mock, verifier, ephemeral: true);
+		cmd.VerifyResponse(verifier, ephemeral: true);
 	}
 
 	[Fact]
 	public static async Task CheckOtherEligibility_WithEligibleMember_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var ctx = new CheckEligibilityCommandTestContext(false, [ NewMemberRole ], MembershipEligibility.Eligible);
-		var mock = await SetupCommandMock(ctx);
 
-		ctx.User.Should().NotBeNull();
+		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
+
+		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
+
 		var verifier = CreateVerifier()
 			.WithDescription(Strings.Command_Eligibility_EligibleText)
-			.WithAuthorName(ctx.User.Username)
+			.WithAuthorName(orchestrator.Subject.Username)
 			.Build();
 
 		// Act
-		await mock.Object.CheckOtherEligibility(ctx.User);
+		await cmd.Object.CheckOtherEligibility(orchestrator.Subject);
 
 		// Assert
-		TestUtilities.VerifyEmbed(mock, verifier, ephemeral: true);
+		cmd.VerifyResponse(verifier, ephemeral: true);
 	}
 
 	[Fact]
 	public static async Task CheckOtherEligibility_WithIneligibleMember_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var ctx = new CheckEligibilityCommandTestContext(false, [ NewMemberRole ], MembershipEligibility.MissingRoles);
-		var mock = await SetupCommandMock(ctx);
+		var orchestrator = await SetupOrchestrator(MembershipEligibility.MissingRoles);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
-		ctx.User.Should().NotBeNull();
+		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
 		var verifier = CreateVerifier()
 			.WithDescription(Strings.Command_Eligibility_IneligibleText)
-			.WithAuthorName(ctx.User.Username)
+			.WithAuthorName(orchestrator.Subject.Username)
 			.WithField(Strings.Command_Eligibility_Section_Requirements, Strings.Command_CheckEligibility_RolesEligibility, true)
 			.Build();
 
 		// Act
-		await mock.Object.CheckOtherEligibility(ctx.User);
+		await cmd.Object.CheckOtherEligibility(orchestrator.Subject);
 
 		// Assert
-		TestUtilities.VerifyEmbed(mock, verifier, ephemeral: true);
+		cmd.VerifyResponse(verifier, ephemeral: true);
 	}
 
 	[Fact]
 	public static async Task CheckOtherEligibility_WithAMHedMember_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var ctx = new CheckEligibilityCommandTestContext(true, [ NewMemberRole ],  MembershipEligibility.MissingRoles);
-		var mock = await SetupCommandMock(ctx);
+		var orchestrator = await SetupOrchestrator(MembershipEligibility.MissingRoles);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
-		ctx.User.Should().NotBeNull();
 		var verifier = CreateVerifier()
 			.WithDescription(Strings.Command_Eligibility_IneligibleText)
-			.WithAuthorName(ctx.User.Username)
+			.WithAuthorName(orchestrator.Subject.Username)
 			.WithField(Strings.Command_Eligibility_Section_Hold, Strings.Command_Eligibility_HoldFormat)
 			.Build();
 
+		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
+
+		// Give the subject an AMH
+		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
+		dbUser.Should().NotBeNull();
+		dbUser.Data.AutoMemberHoldRecord = new AutoMemberHoldRecord
+		{
+			Date = DateTime.UtcNow,
+			ModeratorID = Snowflake.Generate(),
+			Reason = "Testing"
+		};
+
+		await dbUser.CommitAsync();
+
 		// Act
-		await mock.Object.CheckOtherEligibility(ctx.User);
+		await cmd.Object.CheckOtherEligibility(orchestrator.Subject);
 
 		// Assert
-		TestUtilities.VerifyEmbed(mock, verifier, ephemeral: true);
+		cmd.VerifyResponse(verifier, ephemeral: true);
 	}
 
 	[Fact]
 	public static async Task CheckOtherEligibility_WithDynamoError_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var ctx = new CheckEligibilityCommandTestContext(false, [ NewMemberRole ], MembershipEligibility.MissingRoles);
-		var mock = await SetupCommandMock(ctx);
+		var orchestrator = await SetupOrchestrator(MembershipEligibility.MissingRoles);
+		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
-		ctx.DDB.Setup(n => n.GetUserAsync(It.IsAny<Snowflake>()))
-			.Throws(new BadStateException("Bad state"));
+		if (orchestrator.Database is not IMockOf<IDatabaseService> dbMock)
+			throw new InvalidOperationException("This test depends on the registered database implementing IMockOf<IDatabaseService>");
 
+		dbMock.Mock.Setup(n => n.GetOrCreateUserAsync(It.Is<IGuildUser>(n => n.Id == orchestrator.Subject.Id))).Throws<BadStateException>();
 
-		ctx.User.Should().NotBeNull();
 		var verifier = CreateVerifier()
 			.WithDescription(Strings.Command_Eligibility_IneligibleText)
-			.WithAuthorName(ctx.User.Username)
+			.WithAuthorName(orchestrator.Subject.Username)
 			.WithField(Strings.Command_Eligibility_Section_Requirements, Strings.Command_CheckEligibility_RolesEligibility, true)
 			.WithField(Strings.Command_Eligibility_Section_AmbiguousHold, Strings.Command_Eligibility_Error_AmbiguousHold)
 			.Build();
 
 		// Act
-		await mock.Object.CheckOtherEligibility(ctx.User);
+		await cmd.Object.CheckOtherEligibility(orchestrator.Subject);
 
 		// Assert
-		TestUtilities.VerifyEmbed(mock, verifier, ephemeral: true);
-	}
-
-	private record CheckEligibilityCommandTestContext(
-		bool IsAMH, 
-		List<ulong> Roles, 
-		MembershipEligibility Eligibility)
-	{
-		internal IGuildUser? User { get; set; }
-		public MockInstarDDBService DDB { get ; set ; }
+		cmd.VerifyResponse(verifier, ephemeral: true);
 	}
 }

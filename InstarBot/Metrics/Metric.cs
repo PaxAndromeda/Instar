@@ -5,6 +5,13 @@ namespace PaxAndromeda.Instar.Metrics;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public enum Metric
 {
+
+	[MetricName("Schedule Deviation")]
+	ScheduledService_ScheduleDeviation,
+
+	[MetricName("Runtime")]
+	ScheduledService_ServiceRuntime,
+
     [MetricDimension("Service", "Paging System")]
     [MetricName("Pages Sent")]
     Paging_SentPages,

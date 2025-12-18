@@ -11,7 +11,7 @@ using Serilog;
 namespace PaxAndromeda.Instar.Commands;
 
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigService dynamicConfigService, IMetricService metricService, TimeProvider timeProvider) : BaseCommand
+public class AutoMemberHoldCommand(IDatabaseService ddbService, IDynamicConfigService dynamicConfigService, IMetricService metricService, TimeProvider timeProvider) : BaseCommand
 {
 	[UsedImplicitly]
 	[SlashCommand("amh", "Withhold automatic membership grants to a user.")]
@@ -60,7 +60,7 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 				Reason = reason,
 				Date = date
 			};
-			await dbUser.UpdateAsync();
+			await dbUser.CommitAsync();
 
 			// TODO: configurable duration?
 			await RespondAsync(string.Format(Strings.Command_AutoMemberHold_Success, user.Id), ephemeral: true);
@@ -106,7 +106,7 @@ public class AutoMemberHoldCommand(IInstarDDBService ddbService, IDynamicConfigS
 			}
 
 			dbUser.Data.AutoMemberHoldRecord = null;
-			await dbUser.UpdateAsync();
+			await dbUser.CommitAsync();
 
 			await RespondAsync(string.Format(Strings.Command_AutoMemberUnhold_Success, user.Id), ephemeral: true);
 		}

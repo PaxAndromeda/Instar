@@ -1,4 +1,5 @@
-﻿using Ardalis.GuardClauses;
+﻿using System.Diagnostics.CodeAnalysis;
+using Ardalis.GuardClauses;
 using Discord;
 using Discord.Interactions;
 using JetBrains.Annotations;
@@ -8,7 +9,6 @@ using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Preconditions;
 using PaxAndromeda.Instar.Services;
 using Serilog;
-using System.Diagnostics.CodeAnalysis;
 
 namespace PaxAndromeda.Instar.Commands;
 

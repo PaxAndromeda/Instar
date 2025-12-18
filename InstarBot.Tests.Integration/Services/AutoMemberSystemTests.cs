@@ -1,6 +1,9 @@
 ﻿using FluentAssertions;
-using InstarBot.Tests.Models;
-using InstarBot.Tests.Services;
+using InstarBot.Test.Framework;
+using InstarBot.Test.Framework.Models;
+using InstarBot.Test.Framework.Services;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.DynamoModels;
@@ -8,6 +11,7 @@ using PaxAndromeda.Instar.Gaius;
 using PaxAndromeda.Instar.Modals;
 using PaxAndromeda.Instar.Services;
 using Xunit;
+using static Microsoft.ApplicationInsights.MetricDimensionNames.TelemetryContext;
 
 namespace InstarBot.Tests.Integration.Services;
 
@@ -20,85 +24,70 @@ public static class AutoMemberSystemTests
     private static readonly Snowflake SheHer = new(796578609535647765);
     private static readonly Snowflake AutoMemberHold = new(966434762032054282);
 
-    private static async Task<AutoMemberSystem> SetupTest(AutoMemberSystemContext scenarioContext)
-    {
-        var testContext = scenarioContext.TestContext;
+	private static async Task<TestOrchestrator> SetupOrchestrator(AutoMemberSystemContext context)
+	{
+		var orchestrator = await TestOrchestrator.Builder
+			.WithSubject(new TestGuildUser
+			{
+				Username = "username",
+				JoinedAt = DateTimeOffset.Now - TimeSpan.FromHours(context.HoursSinceJoined),
+				RoleIds = context.Roles.Select(n => n.ID).ToList().AsReadOnly()
+			})
+			.WithService<IAutoMemberSystem, AutoMemberSystem>()
+			.Build();
 
-        var discordService = TestUtilities.SetupDiscordService(testContext);
-        var gaiusApiService = TestUtilities.SetupGaiusAPIService(testContext);
-        var config = TestUtilities.GetDynamicConfiguration();
+		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
+		var channel = orchestrator.CreateChannel(Snowflake.Generate());
 
-        scenarioContext.DiscordService = discordService;
-        var userId = scenarioContext.UserID;
-        var relativeJoinTime = scenarioContext.HoursSinceJoined;
-        var roles = scenarioContext.Roles;
-        var postedIntro = scenarioContext.PostedIntroduction;
-        var messagesLast24Hours = scenarioContext.MessagesLast24Hours;
-        var firstSeenTime = scenarioContext.FirstJoinTime;
-        var grantedMembershipBefore = scenarioContext.GrantedMembershipBefore;
-
-        var amsConfig = scenarioContext.Config.AutoMemberConfig;
-
-        var ddbService = new MockInstarDDBService();
-
-		var user = new TestGuildUser
+		if (context.PostedIntroduction)
 		{
-			Id = userId,
-			Username = "username",
-			JoinedAt = DateTimeOffset.Now - TimeSpan.FromHours(relativeJoinTime),
-			RoleIds = roles.Select(n => n.ID).ToList().AsReadOnly()
-		};
+			TestChannel introChannel = (TestChannel) await orchestrator.Discord.GetChannel(orchestrator.Configuration.AutoMemberConfig.IntroductionChannel);
+			introChannel.AddMessage(orchestrator.Subject, "Some introduction");
+		}
+		
+		for (var i = 0; i < context.MessagesLast24Hours; i++)
+			channel.AddMessage(orchestrator.Subject, "Some text");
 
-		var userData = InstarUserData.CreateFrom(user);
-		userData.Position = grantedMembershipBefore ? InstarUserPosition.Member : InstarUserPosition.NewMember;
+		if (context.GrantedMembershipBefore)
+		{
+			var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
+			dbUser.Data.Position = InstarUserPosition.Member;
+			await dbUser.CommitAsync();
+		}
 
-		if (!scenarioContext.SuppressDDBEntry)
-			ddbService.Register(userData);
+		if (context.GaiusInhibited)
+		{
+			TestGaiusAPIService gaiusMock = (TestGaiusAPIService) orchestrator.GetService<IGaiusAPIService>();
+			gaiusMock.Inhibit();
+		}
 
-        testContext.AddRoles(roles);
-
-        testContext.GuildUsers.Add(user);
-
-
-        var genericChannel = Snowflake.Generate();
-        testContext.AddChannel(amsConfig.IntroductionChannel);
-
-        testContext.AddChannel(genericChannel);
-        if (postedIntro)
-            ((TestChannel) testContext.GetChannel(amsConfig.IntroductionChannel)).AddMessage(user, "Some text");
-
-        for (var i = 0; i < messagesLast24Hours; i++)
-            ((TestChannel)testContext.GetChannel(genericChannel)).AddMessage(user, "Some text");
-
-
-        var ams = new AutoMemberSystem(config, discordService, gaiusApiService, ddbService, new MockMetricService(), TimeProvider.System);
+		var ams = (AutoMemberSystem) orchestrator.GetService<IAutoMemberSystem>();
 		await ams.Initialize();
 
-		scenarioContext.User = user;
-		scenarioContext.DynamoService = ddbService;
+		orchestrator.Subject.Reset();
 
-        return ams;
-    }
-
+		return orchestrator;
+	}
 
     [Fact(DisplayName = "Eligible users should be granted membership")]
     public static async Task AutoMemberSystem_EligibleUser_ShouldBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
             .HasPostedIntroduction()
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+        var ams = orchestrator.GetService<IAutoMemberSystem>();
 
 		// Act
         await ams.RunAsync();
 
         // Assert
-        context.AssertMember();
+        context.AssertMember(orchestrator);
     }
 
 
@@ -106,20 +95,21 @@ public static class AutoMemberSystemTests
     public static async Task AutoMemberSystem_EligibleUserWithAMH_ShouldNotBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer, AutoMemberHold)
             .HasPostedIntroduction()
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
+		// Act
+		await ams.RunAsync();
 
         // Assert
-        context.AssertNotMember();
+        context.AssertNotMember(orchestrator);
     }
 
 
@@ -127,146 +117,153 @@ public static class AutoMemberSystemTests
     public static async Task AutoMemberSystem_NewUser_ShouldNotBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(12))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
             .HasPostedIntroduction()
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
+		// Act
+		await ams.RunAsync();
 
         // Assert
-        context.AssertNotMember();
+        context.AssertNotMember(orchestrator);
     }
 
     [Fact(DisplayName = "Inactive users should not be granted membership.")]
     public static async Task AutoMemberSystem_InactiveUser_ShouldNotBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
             .HasPostedIntroduction()
             .WithMessages(10)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
+		// Act
+		await ams.RunAsync();
 
         // Assert
-        context.AssertNotMember();
+        context.AssertNotMember(orchestrator);
     }
 
     [Fact(DisplayName = "Auto Member System should not affect Members.")]
     public static async Task AutoMemberSystem_Member_ShouldNotBeChanged()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(Member, Transfemme, TwentyOnePlus, SheHer)
             .HasPostedIntroduction()
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
+		// Act
+		await ams.RunAsync();
 
         // Assert
-        context.AssertUserUnchanged();
+        context.AssertUserUnchanged(orchestrator);
     }
 
     [Fact(DisplayName = "A user that did not post an introduction should not be granted membership")]
     public static async Task AutoMemberSystem_NoIntroduction_ShouldNotBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
-
+		// Act
+		await ams.RunAsync();
+		
         // Assert
-        context.AssertNotMember();
+        context.AssertNotMember(orchestrator);
     }
 
     [Fact(DisplayName = "A user without an age role should not be granted membership")]
     public static async Task AutoMemberSystem_NoAgeRole_ShouldNotBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, Transfemme, SheHer)
             .HasPostedIntroduction()
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
+		// Act
+		await ams.RunAsync();
 
         // Assert
-        context.AssertNotMember();
+        context.AssertNotMember(orchestrator);
     }
 
     [Fact(DisplayName = "A user without a gender role should not be granted membership")]
     public static async Task AutoMemberSystem_NoGenderRole_ShouldNotBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, TwentyOnePlus, SheHer)
             .HasPostedIntroduction()
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
+		// Act
+		await ams.RunAsync();
 
         // Assert
-        context.AssertNotMember();
+        context.AssertNotMember(orchestrator);
     }
 
     [Fact(DisplayName = "A user without a pronoun role should not be granted membership")]
     public static async Task AutoMemberSystem_NoPronounRole_ShouldNotBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus)
             .HasPostedIntroduction()
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
+		// Act
+		await ams.RunAsync();
 
         // Assert
-        context.AssertNotMember();
+        context.AssertNotMember(orchestrator);
     }
 
     [Fact(DisplayName = "A user with a warning should not be granted membership")]
     public static async Task AutoMemberSystem_UserWithGaiusWarning_ShouldNotBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
             .HasPostedIntroduction()
@@ -274,20 +271,32 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = (AutoMemberSystem) orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
+		TestGaiusAPIService gaiusMock = (TestGaiusAPIService) orchestrator.GetService<IGaiusAPIService>();
+		gaiusMock.AddWarning(orchestrator.Subject, new Warning
+		{
+			Reason = "TEST PUNISHMENT",
+			ModID = Snowflake.Generate(),
+			UserID = orchestrator.Subject.Id
+		});
+		
+		// reload the Gaius warnings
+		await ams.Initialize();
+
+		// Act
+		await ams.RunAsync();
 
         // Assert
-        context.AssertNotMember();
+        context.AssertNotMember(orchestrator);
     }
 
 	[Fact(DisplayName = "A user with a caselog should not be granted membership")]
 	public static async Task AutoMemberSystem_UserWithGaiusCaselog_ShouldNotBeGrantedMembership()
 	{
 		// Arrange
-		var context = await AutoMemberSystemContext.Builder()
+		var context = AutoMemberSystemContext.Builder()
 			.Joined(TimeSpan.FromHours(36))
 			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
 			.HasPostedIntroduction()
@@ -295,20 +304,33 @@ public static class AutoMemberSystemTests
 			.WithMessages(100)
 			.Build();
 
-		var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = (AutoMemberSystem) orchestrator.GetService<IAutoMemberSystem>();
+
+		TestGaiusAPIService gaiusMock = (TestGaiusAPIService) orchestrator.GetService<IGaiusAPIService>();
+		gaiusMock.AddCaselog(orchestrator.Subject, new Caselog
+		{
+			Type = CaselogType.Mute,
+			Reason = "TEST PUNISHMENT",
+			ModID = Snowflake.Generate(),
+			UserID = orchestrator.Subject.Id
+		});
+
+		// reload the Gaius caselogs
+		await ams.Initialize();
 
 		// Act
 		await ams.RunAsync();
 
 		// Assert
-		context.AssertNotMember();
+		context.AssertNotMember(orchestrator);
 	}
 
 	[Fact(DisplayName = "A user with a join age auto kick should be granted membership")]
 	public static async Task AutoMemberSystem_UserWithJoinAgeKick_ShouldBeGrantedMembership()
 	{
 		// Arrange
-		var context = await AutoMemberSystemContext.Builder()
+		var context = AutoMemberSystemContext.Builder()
 			.Joined(TimeSpan.FromHours(36))
 			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
 			.HasPostedIntroduction()
@@ -316,20 +338,33 @@ public static class AutoMemberSystemTests
 			.WithMessages(100)
 			.Build();
 
-		var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = (AutoMemberSystem) orchestrator.GetService<IAutoMemberSystem>();
+		
+		TestGaiusAPIService gaiusMock = (TestGaiusAPIService) orchestrator.GetService<IGaiusAPIService>();
+		gaiusMock.AddCaselog(orchestrator.Subject, new Caselog
+		{
+			Type = CaselogType.Kick,
+			Reason = "Join age punishment",
+			ModID = Snowflake.Generate(),
+			UserID = orchestrator.Subject.Id
+		});
+
+		// reload the Gaius caselogs
+		await ams.Initialize();
 
 		// Act
 		await ams.RunAsync();
 
 		// Assert
-		context.AssertMember();
+		context.AssertMember(orchestrator);
 	}
 
 	[Fact(DisplayName = "A user should be granted membership if Gaius is unavailable")]
     public static async Task AutoMemberSystem_GaiusIsUnavailable_ShouldBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
             .HasPostedIntroduction()
@@ -337,20 +372,21 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = (AutoMemberSystem) orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        await ams.RunAsync();
+		// Act
+		await ams.RunAsync();
 
         // Assert
-        context.AssertMember();
+        context.AssertMember(orchestrator);
     }
 
     [Fact(DisplayName = "A user should be granted membership if they have been granted membership before")]
     public static async Task AutoMemberSystem_MemberThatRejoins_ShouldBeGrantedMembership()
     {
         // Arrange
-        var context = await AutoMemberSystemContext.Builder()
+        var context = AutoMemberSystemContext.Builder()
             .Joined(TimeSpan.FromHours(1))
             .FirstJoined(TimeSpan.FromDays(7))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
@@ -359,11 +395,12 @@ public static class AutoMemberSystemTests
             .WithMessages(100)
             .Build();
 
-        await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
-        // Act
-        var service = context.DiscordService as MockDiscordService;
-        var user = context.User;
+		// Act
+		var service = orchestrator.Discord as TestDiscordService;
+        var user = orchestrator.Subject;
 
         service.Should().NotBeNull();
         user.Should().NotBeNull();
@@ -371,7 +408,7 @@ public static class AutoMemberSystemTests
         await service.TriggerUserJoined(user);
 
         // Assert
-        context.AssertMember();
+        context.AssertMember(orchestrator);
     }
 
 	[Fact(DisplayName = "The Dynamo record for a user should be updated when the user's username changes")]
@@ -380,7 +417,7 @@ public static class AutoMemberSystemTests
 		// Arrange
 		const string newUsername = "fred";
 
-		var context = await AutoMemberSystemContext.Builder()
+		var context = AutoMemberSystemContext.Builder()
 			.Joined(TimeSpan.FromHours(1))
 			.FirstJoined(TimeSpan.FromDays(7))
 			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
@@ -389,22 +426,22 @@ public static class AutoMemberSystemTests
 			.WithMessages(100)
 			.Build();
 
-		await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
 		// Make sure the user is in the database
-		context.DynamoService.Should().NotBeNull(because: "Test is invalid if DynamoService is not set");
-		await context.DynamoService.CreateUserAsync(InstarUserData.CreateFrom(context.User!));
+		await orchestrator.Database.CreateUserAsync(InstarUserData.CreateFrom(orchestrator.Subject));
 
 		// Act
-		MockDiscordService mds = (MockDiscordService) context.DiscordService!;
+		var mds = (TestDiscordService) orchestrator.Discord;
 
-		var newUser = context.User!.Clone();
+		var newUser = orchestrator.Subject.Clone();
 		newUser.Username = newUsername;
 
-		await mds.TriggerUserUpdated(new UserUpdatedEventArgs(context.UserID, context.User, newUser));
+		await mds.TriggerUserUpdated(new UserUpdatedEventArgs(orchestrator.Subject.Id, orchestrator.Subject, newUser));
 
 		// Assert
-		var ddbUser = await context.DynamoService.GetUserAsync(context.UserID);
+		var ddbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
 
 		ddbUser.Should().NotBeNull();
 		ddbUser.Data.Username.Should().Be(newUsername);
@@ -419,7 +456,7 @@ public static class AutoMemberSystemTests
 	{
 
 		// Arrange
-		var context = await AutoMemberSystemContext.Builder()
+		var context = AutoMemberSystemContext.Builder()
 			.Joined(TimeSpan.FromHours(36))
 			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
 			.HasPostedIntroduction()
@@ -427,17 +464,17 @@ public static class AutoMemberSystemTests
 			.SuppressDDBEntry()
 			.Build();
 
-		var ams = await SetupTest(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
 		// Act
 		await ams.RunAsync();
 
 		// Assert
-		context.AssertMember();
+		context.AssertMember(orchestrator);
 	}
 
     private record AutoMemberSystemContext(
-        Snowflake UserID,
         int HoursSinceJoined,
         Snowflake[] Roles,
         bool PostedIntroduction,
@@ -445,33 +482,28 @@ public static class AutoMemberSystemTests
         int FirstJoinTime,
         bool GrantedMembershipBefore,
 		bool SuppressDDBEntry,
-        TestContext TestContext,
-        InstarDynamicConfiguration Config)
+		bool GaiusInhibited)
     {
         public static AutoMemberSystemContextBuilder Builder() => new();
 
-        public IDiscordService? DiscordService { get; set; }
-        public TestGuildUser? User { get; set; }
-        public IInstarDDBService? DynamoService { get ; set ; }
-
-        public void AssertMember()
+        public void AssertMember(TestOrchestrator orchestrator)
         {
-            User.Should().NotBeNull();
-            User.RoleIds.Should().Contain(Member.ID);
-            User.RoleIds.Should().NotContain(NewMember.ID);
+			orchestrator.Subject.Should().NotBeNull();
+			orchestrator.Subject.RoleIds.Should().Contain(Member.ID);
+			orchestrator.Subject.RoleIds.Should().NotContain(NewMember.ID);
         }
 
-        public void AssertNotMember()
+        public void AssertNotMember(TestOrchestrator orchestrator)
         {
-            User.Should().NotBeNull();
-            User.RoleIds.Should().NotContain(Member.ID);
-            User.RoleIds.Should().Contain(NewMember.ID);
+            orchestrator.Subject.Should().NotBeNull();
+			orchestrator.Subject.RoleIds.Should().NotContain(Member.ID);
+			orchestrator.Subject.RoleIds.Should().Contain(NewMember.ID);
         }
 
-        public void AssertUserUnchanged()
+        public void AssertUserUnchanged(TestOrchestrator orchestrator)
         {
-            User.Should().NotBeNull();
-            User.Changed.Should().BeFalse();
+			orchestrator.Subject.Should().NotBeNull();
+			orchestrator.Subject.Changed.Should().BeFalse();
         }
     }
 
@@ -495,6 +527,7 @@ public static class AutoMemberSystemTests
             _hoursSinceJoined = (int) Math.Round(timeAgo.TotalHours);
             return this;
         }
+
         public AutoMemberSystemContextBuilder SetRoles(params Snowflake[] roles)
         {
             _roles = roles;
@@ -551,39 +584,9 @@ public static class AutoMemberSystemTests
 			return this;
 		}
 
-		public async Task<AutoMemberSystemContext> Build()
+		public AutoMemberSystemContext Build()
         {
-            var config = await TestUtilities.GetDynamicConfiguration().GetConfig();
-
-            var testContext = new TestContext();
-
-            var userId = Snowflake.Generate();
-
-            // Set up any warnings or whatnot
-            testContext.InhibitGaius = !_gaiusAvailable;
-
-            if (_gaiusPunished)
-            {
-                testContext.AddCaselog(userId, new Caselog
-                {
-                    Type = _joinAgeKick ? CaselogType.Kick : CaselogType.Mute,
-                    Reason = _joinAgeKick ? "Join age punishment" : "TEST PUNISHMENT",
-                    ModID = Snowflake.Generate(),
-                    UserID = userId
-                });
-            }
-            if (_gaiusWarned)
-            {
-                testContext.AddWarning(userId, new Warning
-                {
-                    Reason = "TEST PUNISHMENT",
-                    ModID = Snowflake.Generate(),
-                    UserID = userId
-                });
-            }
-
             return new AutoMemberSystemContext(
-                userId,
                 _hoursSinceJoined,
                 _roles ?? throw new InvalidOperationException("Roles must be set."),
                 _postedIntroduction,
@@ -591,8 +594,7 @@ public static class AutoMemberSystemTests
                 _firstJoinTime,
                 _grantedMembershipBefore,
 				_suppressDDB,
-				testContext,
-                config);
+				_gaiusAvailable);
         }
     }
 }

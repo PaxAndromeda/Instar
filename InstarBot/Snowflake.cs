@@ -159,7 +159,7 @@ public sealed record Snowflake
         var newIncrement = Interlocked.Increment(ref _increment);
 
         // Gracefully handle overflows
-        if (newIncrement == int.MinValue)
+        if (newIncrement >= 4096)
         {
             newIncrement = 0;
             Interlocked.Exchange(ref _increment, 0);

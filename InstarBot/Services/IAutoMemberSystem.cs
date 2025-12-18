@@ -3,10 +3,8 @@ using PaxAndromeda.Instar.ConfigModels;
 
 namespace PaxAndromeda.Instar.Services;
 
-public interface IAutoMemberSystem
+public interface IAutoMemberSystem : IScheduledService
 {
-	Task RunAsync();
-
 	/// <summary>
 	/// Determines the eligibility of a user for membership based on specific criteria.
 	/// </summary>
@@ -25,6 +23,4 @@ public interface IAutoMemberSystem
 	/// </list>
 	/// </remarks>
 	MembershipEligibility CheckEligibility(InstarDynamicConfiguration cfg, IGuildUser user);
-
-	Task Initialize();
 }

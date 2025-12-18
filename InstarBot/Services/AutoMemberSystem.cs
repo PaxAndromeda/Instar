@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Runtime.Caching;
-using System.Timers;
 using Discord;
 using Discord.WebSocket;
 using PaxAndromeda.Instar.Caching;
@@ -10,11 +9,10 @@ using PaxAndromeda.Instar.Gaius;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Modals;
 using Serilog;
-using Timer = System.Timers.Timer;
 
 namespace PaxAndromeda.Instar.Services;
 
-public sealed class AutoMemberSystem : IAutoMemberSystem
+public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 {
     private readonly MemoryCache _ddbCache = new("AutoMemberSystem_DDBCache");
     private readonly MemoryCache<MessageProperties> _messageCache = new("AutoMemberSystem_MessageCache");
@@ -26,10 +24,9 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
     private readonly IDynamicConfigService _dynamicConfig;
     private readonly IDiscordService _discord;
     private readonly IGaiusAPIService _gaiusApiService;
-    private readonly IInstarDDBService _ddbService;
+    private readonly IDatabaseService _ddbService;
     private readonly IMetricService _metricService;
     private readonly TimeProvider _timeProvider;
-    private Timer _timer = null!;
 
     /// <summary>
     /// Recent messages per the last AMS run
@@ -37,7 +34,8 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
     private Dictionary<ulong, int>? _recentMessages;
 
     public AutoMemberSystem(IDynamicConfigService dynamicConfig, IDiscordService discord, IGaiusAPIService gaiusApiService,
-        IInstarDDBService ddbService, IMetricService metricService, TimeProvider timeProvider)
+        IDatabaseService ddbService, IMetricService metricService, TimeProvider timeProvider)
+		: base("0 * * * *", timeProvider, metricService, "Auto Member System")
     {
         _dynamicConfig = dynamicConfig;
         _discord = discord;
@@ -53,7 +51,7 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
         discord.MessageDeleted += HandleMessageDeleted;
     }
 
-    public async Task Initialize()
+    internal override async Task Initialize()
     {
         var cfg = await _dynamicConfig.GetConfig();
         
@@ -64,8 +62,6 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
 
         if (cfg.AutoMemberConfig.EnableGaiusCheck)
             await PreloadGaiusPunishments();
-
-        StartTimer();
     }
 
 	/// <summary>
@@ -169,7 +165,7 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
                 case InstarUserPosition.Unknown:
                     await user.AddRoleAsync(cfg.NewMemberRoleID);
                     dbUser.Data.Position = InstarUserPosition.NewMember;
-                    await dbUser.UpdateAsync();
+                    await dbUser.CommitAsync();
                     break;
                 
                 default:
@@ -228,45 +224,11 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
 		if (changed)
 		{
 			Log.Information("Updated metadata for user {Username} (user ID {UserID})", arg.After.Username, arg.ID);
-			await user.UpdateAsync();
+			await user.CommitAsync();
 		}
 	}
-
-	private void StartTimer()
-    {
-		// Since we can start the bot in the middle of an hour,
-		// first we must determine the time until the next top
-		// of hour.
-		var currentTime = _timeProvider.GetUtcNow().UtcDateTime;
-        var nextHour = new DateTime(currentTime.Year, currentTime.Month, currentTime.Day,
-			currentTime.Hour, 0, 0).AddHours(1);
-        var millisecondsRemaining = (nextHour - currentTime).TotalMilliseconds;
-        
-        // Start the timer.  In elapsed step, we reset the
-        // duration to exactly 1 hour.
-        _timer = new Timer(millisecondsRemaining);
-        _timer.Elapsed += TimerElapsed;
-        _timer.Start();
-
-		Log.Information("Auto member system timer started, first run in {SecondsRemaining} seconds.", millisecondsRemaining / 1000);
-	}
-
-    private async void TimerElapsed(object? sender, ElapsedEventArgs e)
-    {
-        try
-        {
-            // Ensure the timer's interval is exactly 1 hour
-            _timer.Interval = 60 * 60 * 1000;
-
-            await RunAsync();
-        }
-        catch
-        {
-            // ignore
-        }
-    }
     
-    public async Task RunAsync()
+    public override async Task RunAsync()
     {
         try
         {
@@ -383,7 +345,7 @@ public sealed class AutoMemberSystem : IAutoMemberSystem
         await user.RemoveRoleAsync(cfg.NewMemberRoleID);
         
         dbUser.Data.Position = InstarUserPosition.Member;
-        await dbUser.UpdateAsync();
+        await dbUser.CommitAsync();
 
         // Remove the cache entry
         if (_ddbCache.Contains(user.Id.ToString()))

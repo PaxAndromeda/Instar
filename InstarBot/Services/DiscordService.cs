@@ -1,4 +1,5 @@
-﻿using Discord;
+﻿using System.Diagnostics.CodeAnalysis;
+using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
@@ -8,7 +9,6 @@ using PaxAndromeda.Instar.Modals;
 using PaxAndromeda.Instar.Wrappers;
 using Serilog;
 using Serilog.Events;
-using System.Diagnostics.CodeAnalysis;
 
 namespace PaxAndromeda.Instar.Services;
 

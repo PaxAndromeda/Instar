@@ -7,72 +7,28 @@ using Serilog;
 using Metric = PaxAndromeda.Instar.Metrics.Metric;
 
 namespace PaxAndromeda.Instar.Services;
-using System.Timers;
 
 public sealed class BirthdaySystem (
 	IDynamicConfigService dynamicConfig,
 	IDiscordService discord,
-	IInstarDDBService ddbService,
+	IDatabaseService ddbService,
 	IMetricService metricService,
 	TimeProvider timeProvider)
-	: IBirthdaySystem
+	: ScheduledService("*/5 * * * *", timeProvider, metricService, "Birthday System"), IBirthdaySystem
 {
 	/// <summary>
 	/// The maximum age to be considered 'valid' for age role assignment.
 	/// </summary>
 	private const int MaximumAge = 150;
 
-	private Timer _timer = null!;
-
 	[ExcludeFromCodeCoverage]
-	public Task Initialize()
+	internal override Task Initialize()
 	{
-		StartTimer();
+		// nothing to do
 		return Task.CompletedTask;
 	}
 
-	[ExcludeFromCodeCoverage]
-	private void StartTimer()
-	{
-		// We need to run the birthday check every 30 minutes
-		// to accomodate any time zone differences.
-
-		var currentTime = timeProvider.GetUtcNow().UtcDateTime;
-
-		bool firstHalfHour = currentTime.Minute < 30;
-		DateTime currentHour = new (currentTime.Year, currentTime.Month, currentTime.Day,
-			currentTime.Hour, 0, 0, DateTimeKind.Utc);
-
-		DateTime firstRun = firstHalfHour ? currentHour.AddMinutes(30) : currentHour.AddHours(1);
-
-		var millisecondsRemaining = (firstRun - currentTime).TotalMilliseconds;
-
-		_timer = new Timer(millisecondsRemaining);
-		_timer.Elapsed += TimerElapsed;
-		_timer.Start();
-
-
-
-		Log.Information("Birthday system timer started, first run in {SecondsRemaining} seconds.", millisecondsRemaining / 1000);
-	}
-
-	[ExcludeFromCodeCoverage]
-	private async void TimerElapsed(object? sender, ElapsedEventArgs e)
-	{
-		try
-		{
-			// Ensure the timer's interval is exactly 30 minutes.
-			_timer.Interval = 30 * 60 * 1000;
-
-			await RunAsync();
-		}
-		catch
-		{
-			// ignore
-		}
-	}
-
-	public async Task RunAsync()
+	public override async Task RunAsync()
 	{
 		var cfg = await dynamicConfig.GetConfig();
 		var currentTime = timeProvider.GetUtcNow().UtcDateTime;

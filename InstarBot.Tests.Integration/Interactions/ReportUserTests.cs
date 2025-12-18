@@ -1,6 +1,7 @@
 ﻿using Discord;
 using FluentAssertions;
-using InstarBot.Tests.Services;
+using InstarBot.Test.Framework;
+using InstarBot.Test.Framework.Models;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
@@ -11,17 +12,25 @@ namespace InstarBot.Tests.Integration.Interactions;
 
 public static class ReportUserTests
 {
+	private static async Task<TestOrchestrator> SetupOrchestrator(ReportContext context)
+	{
+		var orchestrator = TestOrchestrator.Default;
+
+		orchestrator.CreateChannel(context.Channel);
+
+		return orchestrator;
+	}
+
     [Fact(DisplayName = "User should be able to report a message normally")]
     public static async Task ReportUser_WhenReportingNormally_ShouldNotifyStaff()
     {
         var context = ReportContext.Builder()
-            .FromUser(Snowflake.Generate())
-            .Reporting(Snowflake.Generate())
             .InChannel(Snowflake.Generate())
             .WithReason("This is a test report")
             .Build();
 
-        var (command, interactionContext, channelMock) = SetupMocks(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var command = orchestrator.GetCommand<ReportUserCommand>();
 
 		var verifier = EmbedVerifier.Builder()
 			.WithFooterText(Strings.Embed_UserReport_Footer)
@@ -33,95 +42,62 @@ public static class ReportUserTests
 			.Build();
 
         // Act
-        await command.Object.HandleCommand(interactionContext.Object);
+        await command.Object.HandleCommand(SetupMessageCommandMock(orchestrator, context));
         await command.Object.ModalResponse(new ReportMessageModal
         {
             ReportReason = context.Reason
         });
 
-        // Assert
-        TestUtilities.VerifyMessage(command, Strings.Command_ReportUser_ReportSent, true);
-
-
-		TestUtilities.VerifyChannelEmbed(channelMock, verifier, "{0}");
-
-
-		context.ResultEmbed.Should().NotBeNull();
-        var embed = context.ResultEmbed;
-
-        embed.Author.Should().NotBeNull();
-        embed.Footer.Should().NotBeNull();
-        embed.Footer!.Value.Text.Should().Be("Instar Message Reporting System");
+		// Assert
+		command.VerifyResponse(Strings.Command_ReportUser_ReportSent, true);
+		
+		((TestChannel) await orchestrator.Discord.GetChannel(orchestrator.Configuration.StaffAnnounceChannel)).VerifyEmbed(verifier, "{@}");
     }
 
     [Fact(DisplayName = "Report user function times out if cache expires")]
     public static async Task ReportUser_WhenReportingNormally_ShouldFail_IfNotCompletedWithin5Minutes()
     {
         var context = ReportContext.Builder()
-            .FromUser(Snowflake.Generate())
-            .Reporting(Snowflake.Generate())
             .InChannel(Snowflake.Generate())
             .WithReason("This is a test report")
             .Build();
 
-        var (command, interactionContext, _) = SetupMocks(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var command = orchestrator.GetCommand<ReportUserCommand>();
 
-        // Act
-        await command.Object.HandleCommand(interactionContext.Object);
+		// Act
+		await command.Object.HandleCommand(SetupMessageCommandMock(orchestrator, context));
         ReportUserCommand.PurgeCache();
         await command.Object.ModalResponse(new ReportMessageModal
         {
             ReportReason = context.Reason
         });
 
-        // Assert
-        TestUtilities.VerifyMessage(command, Strings.Command_ReportUser_ReportExpired, true);
+		// Assert
+		command.VerifyResponse(Strings.Command_ReportUser_ReportExpired, true);
     }
 
-    private static (Mock<ReportUserCommand>, Mock<IInstarMessageCommandInteraction>, Mock<ITextChannel>) SetupMocks(ReportContext context)
+    private static IInstarMessageCommandInteraction SetupMessageCommandMock(TestOrchestrator orchestrator, ReportContext context)
     {
-        var commandMockContext = new TestContext
-        {
-            UserID = context.User,
-            EmbedCallback = embed => context.ResultEmbed = embed
-        };
+		TestChannel testChannel = (TestChannel) orchestrator.Guild.GetTextChannel(context.Channel);
+		var message = testChannel.AddMessage(orchestrator.Subject, "Naughty message");
 
-        var commandMock =
-            TestUtilities.SetupCommandMock
-            (() => new ReportUserCommand(TestUtilities.GetDynamicConfiguration(), new MockMetricService()),
-                commandMockContext);
-
-        return (commandMock, SetupMessageCommandMock(context), commandMockContext.TextChannelMock);
-    }
-
-    private static Mock<IInstarMessageCommandInteraction> SetupMessageCommandMock(ReportContext context)
-    {
-        var userMock = TestUtilities.SetupUserMock<IGuildUser>(context.User);
-        var authorMock = TestUtilities.SetupUserMock<IGuildUser>(context.Sender);
-
-        var channelMock = TestUtilities.SetupChannelMock<ITextChannel>(context.Channel);
-
-        var messageMock = new Mock<IMessage>();
-        messageMock.Setup(n => n.Id).Returns(100);
-        messageMock.Setup(n => n.Author).Returns(authorMock.Object);
-        messageMock.Setup(n => n.Channel).Returns(channelMock.Object);
-
-        var socketMessageDataMock = new Mock<IMessageCommandInteractionData>();
-        socketMessageDataMock.Setup(n => n.Message).Returns(messageMock.Object);
+		var socketMessageDataMock = new Mock<IMessageCommandInteractionData>();
+        socketMessageDataMock.Setup(n => n.Message).Returns(message);
 
         var socketMessageCommandMock = new Mock<IInstarMessageCommandInteraction>();
-        socketMessageCommandMock.Setup(n => n.User).Returns(userMock.Object);
+        socketMessageCommandMock.Setup(n => n.User).Returns(orchestrator.Actor);
         socketMessageCommandMock.Setup(n => n.Data).Returns(socketMessageDataMock.Object);
 
         socketMessageCommandMock.Setup<Task>(n =>
                 n.RespondWithModalAsync<ReportMessageModal>(It.IsAny<string>(), It.IsAny<RequestOptions>(),
                     It.IsAny<Action<ModalBuilder>>()))
             .Returns(Task.CompletedTask);
-
-        return socketMessageCommandMock;
+        
+        return socketMessageCommandMock.Object;
     }
 
-    private record ReportContext(Snowflake User, Snowflake Sender, Snowflake Channel, string Reason)
+    private record ReportContext(Snowflake Channel, string Reason)
     {
         public static ReportContextBuilder Builder()
         {
@@ -133,30 +109,8 @@ public static class ReportUserTests
 
     private class ReportContextBuilder
     {
-        private Snowflake? _user;
-        private Snowflake? _sender;
         private Snowflake? _channel;
         private string? _reason;
-
-        /*
-         * ReportContext.Builder()
-         *    .FromUser(user)
-         *    .Reporting(userToReport)
-         *    .WithContent(content)
-         *    .InChannel(channel)
-         *    .WithReason(reason);
-         */
-        public ReportContextBuilder FromUser(Snowflake user)
-        {
-            _user = user;
-            return this;
-        }
-
-        public ReportContextBuilder Reporting(Snowflake userToReport)
-        {
-            _sender = userToReport;
-            return this;
-        }
 
         public ReportContextBuilder InChannel(Snowflake channel)
         {
@@ -172,16 +126,12 @@ public static class ReportUserTests
 
         public ReportContext Build()
         {
-            if (_user is null)
-                throw new InvalidOperationException("User must be set before building ReportContext");
-            if (_sender is null)
-                throw new InvalidOperationException("Sender must be set before building ReportContext");
             if (_channel is null)
                 throw new InvalidOperationException("Channel must be set before building ReportContext");
             if (_reason is null)
                 throw new InvalidOperationException("Reason must be set before building ReportContext");
 
-            return new ReportContext(_user, _sender, _channel, _reason);
+            return new ReportContext(_channel, _reason);
         }
     }
 }

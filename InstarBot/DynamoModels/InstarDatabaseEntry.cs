@@ -21,6 +21,13 @@ public sealed class InstarDatabaseEntry<T>(IDynamoDBContext context, T data)
     /// Persists changes to the underlying storage system asynchronously.
     /// </summary>
     /// <returns>A <see cref="Task"/> that can be used to poll or wait for results, or both</returns>
-    public Task UpdateAsync()
+    public Task CommitAsync()
         => context.SaveAsync(Data);
+
+	/// <summary>
+	/// Asynchronously deletes the associated data from the database.
+	/// </summary>
+	/// <returns>A <see cref="Task"/> that can be used to poll or wait for results, or both</returns>
+	public Task DeleteAsync()
+		=> context.DeleteAsync(Data);
 }

@@ -1,9 +1,11 @@
 ﻿using Discord;
-using InstarBot.Tests.Models;
-using InstarBot.Tests.Services;
+using FluentAssertions;
+using InstarBot.Test.Framework;
+using InstarBot.Test.Framework.Models;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
+using PaxAndromeda.Instar.ConfigModels;
 using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
@@ -12,36 +14,47 @@ public static class PageCommandTests
 {
 	private const string TestReason = "Test reason for paging";
 
-    private static async Task<Mock<PageCommand>> SetupCommandMock(PageCommandTestContext context)
+    private static async Task<TestOrchestrator> SetupOrchestrator(PageCommandTestContext context)
     {
-        // Treat the Test page target as a regular non-staff user on the server
-        var userTeam = context.UserTeamID == PageTarget.Test
-            ? Snowflake.Generate()
-            : (await TestUtilities.GetTeams(context.UserTeamID).FirstAsync()).ID;
+		var orchestrator = TestOrchestrator.Default;
 
-        var commandMock = TestUtilities.SetupCommandMock(
-            () => new PageCommand(TestUtilities.GetTeamService(), new MockMetricService()),
-            new TestContext
-            {
-                UserRoles = [userTeam]
-            });
+		if (context.UserTeamID != PageTarget.Test)
+			await orchestrator.Actor.AddRoleAsync(GetTeamRole(orchestrator, context.UserTeamID));
 
-        return commandMock;
+		return orchestrator;
     }
 
-    private static async Task<ulong> GetTeamLead(PageTarget pageTarget)
-    {
-        var dynamicConfig = await TestUtilities.GetDynamicConfiguration().GetConfig();
+	public static async IAsyncEnumerable<Team> GetTeams(TestOrchestrator orchestrator, PageTarget pageTarget)
+	{
+		var teamsConfig = orchestrator.Configuration.Teams.ToDictionary(n => n.InternalID, n => n);
 
-        var teamsConfig =
-            dynamicConfig.Teams.ToDictionary(n => n.InternalID, n => n);
+		teamsConfig.Should().NotBeNull();
 
-        // Eeeeeeeeeeeeevil
-        return teamsConfig[pageTarget.GetAttributesOfType<TeamRefAttribute>()?.First().InternalID ?? "idkjustfail"]
-            .Teamleader;
-    }
+		var teamRefs = pageTarget.GetAttributesOfType<TeamRefAttribute>()?.Select(n => n.InternalID) ??
+					   [];
 
-    private static async Task VerifyPageEmbedEmitted(Mock<PageCommand> command, PageCommandTestContext context)
+		foreach (var internalId in teamRefs)
+		{
+			if (!teamsConfig.TryGetValue(internalId, out var value))
+				throw new KeyNotFoundException("Failed to find team with internal ID " + internalId);
+
+			yield return value;
+		}
+	}
+
+	private static Snowflake GetTeamRole(TestOrchestrator orchestrator, PageTarget owner)
+	{
+		var teamId = owner.GetAttributeOfType<TeamRefAttribute>()?.InternalID;
+
+		if (teamId is null)
+			throw new InvalidOperationException($"Failed to find a team for {owner}");
+
+		var team = orchestrator.Configuration.Teams.FirstOrDefault(n => n.InternalID.Equals(teamId, StringComparison.Ordinal));
+
+		return team is null ? throw new InvalidOperationException($"Failed to find a team for {owner} (internal ID: {teamId})") : team.ID;
+	}
+
+	private static async Task VerifyPageEmbedEmitted(TestOrchestrator orchestrator, Mock<PageCommand> command, PageCommandTestContext context)
     {
 		var verifier = EmbedVerifier.Builder()
 			.WithFooterText(Strings.Embed_Page_Footer)
@@ -70,43 +83,44 @@ public static class PageCommandTests
 			{
 				case PageTarget.All:
 					messageFormat = string.Join(' ',
-						await TestUtilities.GetTeams(PageTarget.All).Select(n => Snowflake.GetMention(() => n.ID))
+						await GetTeams(orchestrator, PageTarget.All).Select(n => Snowflake.GetMention(() => n.ID))
 							.ToArrayAsync());
 					break;
 				case PageTarget.Test:
 					messageFormat = Strings.Command_Page_TestPageMessage;
 					break;
 				default:
-					var team = await TestUtilities.GetTeams(context.PageTarget).FirstAsync();
+					var team = await GetTeams(orchestrator, context.PageTarget).FirstAsync();
 					messageFormat = Snowflake.GetMention(() => team.ID);
 					break;
 			}
 
 
-		TestUtilities.VerifyEmbed(command, verifier.Build(), messageFormat);
+		command.VerifyResponse(messageFormat, verifier.Build());
     }
 
     [Fact(DisplayName = "User should be able to page when authorized")]
     public static async Task PageCommand_Authorized_WhenPagingTeam_ShouldPageCorrectly()
     {
-        // Arrange
-		TestUtilities.SetupLogging();
-        var context = new PageCommandTestContext(
-            PageTarget.Owner,
-            PageTarget.Moderator,
-            false
-        );
+		// Arrange
+		var context = new PageCommandTestContext(
+			PageTarget.Owner,
+			PageTarget.Moderator,
+			false
+		);
 
-        var command = await SetupCommandMock(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var command = orchestrator.GetCommand<PageCommand>();
+
 
         // Act
         await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
         // Assert
-        await VerifyPageEmbedEmitted(command, context);
+        await VerifyPageEmbedEmitted(orchestrator, command, context);
 	}
 
-	[Fact(DisplayName = "User should be able to page a team's teamleader")]
+    [Fact(DisplayName = "User should be able to page a team's teamleader")]
 	public static async Task PageCommand_Authorized_WhenPagingTeamLeader_ShouldPageCorrectly()
 	{
 		// Arrange
@@ -116,13 +130,14 @@ public static class PageCommandTests
 			true
 		);
 
-		var command = await SetupCommandMock(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var command = orchestrator.GetCommand<PageCommand>();
 
 		// Act
 		await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
 		// Assert
-		await VerifyPageEmbedEmitted(command, context);
+		await VerifyPageEmbedEmitted(orchestrator, command, context);
 	}
 
 	[Fact(DisplayName = "User should be able to page a with user, channel and message")]
@@ -138,13 +153,14 @@ public static class PageCommandTests
 			Message: "<message link>"
 		);
 
-		var command = await SetupCommandMock(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var command = orchestrator.GetCommand<PageCommand>();
 
 		// Act
 		await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, context.Message!, context.TargetUser, context.TargetChannel);
 
 		// Assert
-		await VerifyPageEmbedEmitted(command, context);
+		await VerifyPageEmbedEmitted(orchestrator, command, context);
 	}
 
 	[Fact(DisplayName = "Any staff member should be able to use the Test page")]
@@ -161,14 +177,15 @@ public static class PageCommandTests
                 false
             );
 
-            var command = await SetupCommandMock(context);
+			var orchestrator = await SetupOrchestrator(context);
+			var command = orchestrator.GetCommand<PageCommand>();
 
-            // Act
-            await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader,
+			// Act
+			await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader,
                 string.Empty);
 
             // Assert
-            await VerifyPageEmbedEmitted(command, context);
+            await VerifyPageEmbedEmitted(orchestrator, command, context);
         }
     }
 
@@ -182,13 +199,14 @@ public static class PageCommandTests
             false
         );
 
-        var command = await SetupCommandMock(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var command = orchestrator.GetCommand<PageCommand>();
 
-        // Act
-        await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
+		// Act
+		await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
         // Assert
-        await VerifyPageEmbedEmitted(command, context);
+        await VerifyPageEmbedEmitted(orchestrator, command, context);
     }
 
     [Fact(DisplayName = "Fail page if paging all teamleader")]
@@ -201,15 +219,15 @@ public static class PageCommandTests
             true
         );
 
-        var command = await SetupCommandMock(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var command = orchestrator.GetCommand<PageCommand>();
 
-        // Act
-        await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
+		// Act
+		await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
-        // Assert
-        TestUtilities.VerifyMessage(
-            command,
-            Strings.Command_Page_Error_NoAllTeamlead,
+		// Assert
+		command.VerifyResponse(
+			Strings.Command_Page_Error_NoAllTeamlead,
             true
         );
     }
@@ -224,14 +242,14 @@ public static class PageCommandTests
             false
         );
 
-        var command = await SetupCommandMock(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var command = orchestrator.GetCommand<PageCommand>();
 
-        // Act
-        await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
+		// Act
+		await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
-        // Assert
-        TestUtilities.VerifyMessage(
-            command,
+		// Assert
+		command.VerifyResponse(
 			Strings.Command_Page_Error_NotAuthorized,
             true
         );
@@ -247,14 +265,14 @@ public static class PageCommandTests
             false
         );
 
-        var command = await SetupCommandMock(context);
+		var orchestrator = await SetupOrchestrator(context);
+		var command = orchestrator.GetCommand<PageCommand>();
 
-        // Act
-        await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
+		// Act
+		await command.Object.Page(context.PageTarget, TestReason, context.PagingTeamLeader, string.Empty);
 
-        // Assert
-        TestUtilities.VerifyMessage(
-            command,
+		// Assert
+		command.VerifyResponse(
 			Strings.Command_Page_Error_FullTeamNotAuthorized,
             true
         );

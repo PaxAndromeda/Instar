@@ -29,6 +29,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\InstarBot.Tests.Common\InstarBot.Tests.Common.csproj" />
+        <ProjectReference Include="..\InstarBot.Tests.Orchestrator\InstarBot.Test.Framework.csproj" />
         <ProjectReference Include="..\InstarBot\InstarBot.csproj" />
     </ItemGroup>
 
