@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Amazon;
 using Amazon.CloudWatchLogs;
-using CommandLine;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PaxAndromeda.Instar.Commands;
@@ -11,6 +10,10 @@ using Serilog.Events;
 using Serilog.Formatting.Json;
 using Serilog.Sinks.AwsCloudWatch;
 
+#if !DEBUG
+using CommandLine;
+#endif
+
 namespace PaxAndromeda.Instar;
 
 [ExcludeFromCodeCoverage]
@@ -19,6 +22,7 @@ internal static class Program
     private static CancellationTokenSource _cts = null!;
     private static IServiceProvider _services = null!;
 
+    // ReSharper disable once UnusedParameter.Global
     public static async Task Main(string[] args)
     {
         AppDomain.CurrentDomain.UnhandledException += CurrentDomainOnUnhandledException;
