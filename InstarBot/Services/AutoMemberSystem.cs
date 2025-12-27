@@ -178,6 +178,7 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
         
         await _metricService.Emit(Metric.Discord_UsersJoined, 1);
 	}
+
 	private async Task HandleUserLeft(IUser arg)
 	{
 		// TODO: Maybe handle something here later
@@ -225,6 +226,25 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 		{
 			Log.Information("Updated metadata for user {Username} (user ID {UserID})", arg.After.Username, arg.ID);
 			await user.CommitAsync();
+		}
+
+		// Does the user have any of the auto kick roles?
+		try
+		{
+			var cfg = await _dynamicConfig.GetConfig();
+
+			if (cfg.AutoKickRoles is null)
+				return;
+
+			if (!cfg.AutoKickRoles.ContainsAny(arg.After.RoleIds.Select(n => new Snowflake(n)).ToArray()))
+				return;
+
+			await arg.After.KickAsync("Automatically kicked for having a forbidden role.");
+			await _metricService.Emit(Metric.AMS_ForbiddenRoleKicks, 1);
+		}
+		catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to determine if user {UserID} has any forbidden roles.", arg.ID.ID);
 		}
 	}
     

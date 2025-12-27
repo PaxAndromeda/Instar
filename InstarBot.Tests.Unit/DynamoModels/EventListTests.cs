@@ -68,7 +68,7 @@ public class EventListTests
             new(2, DateTime.Now - TimeSpan.FromMinutes(1))
         };
         
-        list.Latest().Value.Should().Be(3);
+        list.Latest()?.Value.Should().Be(3);
         list.First().Value.Should().Be(2);
 
         // Act
@@ -117,7 +117,7 @@ public class EventListTests
     
     private class TestEntry<T>(T value, DateTime date) : ITimedEvent
     {
-        public DateTime Date { get; set; } = date;
-        public T Value { get; set; } = value;
+        public DateTime Date { get; } = date;
+        public T Value { get; } = value;
     }
 }

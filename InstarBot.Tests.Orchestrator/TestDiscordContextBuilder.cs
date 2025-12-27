@@ -1,26 +1,22 @@
-﻿using System.Collections.ObjectModel;
-using Discord;
-using InstarBot.Test.Framework.Models;
+﻿using InstarBot.Test.Framework.Models;
+using JetBrains.Annotations;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.Services;
+using System.Collections.ObjectModel;
 
 namespace InstarBot.Test.Framework;
 
-public class TestDiscordContext
+public class TestDiscordContext(
+	Snowflake guildId,
+	IEnumerable<TestGuildUser> users,
+	IEnumerable<TestChannel> channels,
+	IEnumerable<TestRole> roles)
 {
-	public Snowflake GuildId { get; }
-	public ReadOnlyCollection<TestGuildUser> Users { get; }
-	public ReadOnlyCollection<TestChannel> Channels { get; }
-	public ReadOnlyCollection<TestRole> Roles { get; }
-
-	public TestDiscordContext(Snowflake guildId, IEnumerable<TestGuildUser> users, IEnumerable<TestChannel> channels, IEnumerable<TestRole> roles)
-	{
-		GuildId = guildId;
-		Users = users.ToList().AsReadOnly();
-		Channels = channels.ToList().AsReadOnly();
-		Roles = roles.ToList().AsReadOnly();
-	}
+	public Snowflake GuildId { get; } = guildId;
+	public ReadOnlyCollection<TestGuildUser> Users { get; } = users.ToList().AsReadOnly();
+	public ReadOnlyCollection<TestChannel> Channels { get; } = channels.ToList().AsReadOnly();
+	public ReadOnlyCollection<TestRole> Roles { get; } = roles.ToList().AsReadOnly();
 
 	public static TestDiscordContextBuilder Builder => new();
 }
@@ -37,6 +33,7 @@ public class TestDiscordContextBuilder : IBuilder<TestDiscordContext>
 		return new TestDiscordContext(_guildId, _registeredUsers.Values, _registeredChannels.Values, _registeredRoles.Values);
 	}
 
+	[UsedImplicitly]
 	public async Task<TestDiscordContextBuilder> LoadFromConfig(IDynamicConfigService configService)
 	{
 		var cfg = await configService.GetConfig();
@@ -115,7 +112,6 @@ public class TestDiscordContextBuilder : IBuilder<TestDiscordContext>
 		_registeredUsers.Add(snowflake, new TestGuildUser(snowflake)
 		{
 			GlobalName = name,
-			DisplayName = name,
 			Username = name,
 			Nickname = name
 		});
@@ -127,7 +123,7 @@ public class TestDiscordContextBuilder : IBuilder<TestDiscordContext>
 		return this;
 	}
 
-	internal bool TryGetUser(Snowflake userId, out TestGuildUser testGuildUser)
+	internal bool TryGetUser(Snowflake userId, out TestGuildUser? testGuildUser)
 	{
 		return _registeredUsers.TryGetValue(userId, out testGuildUser);
 	}

@@ -1,4 +1,5 @@
 ﻿using Discord;
+using Discord.Interactions;
 using InstarBot.Tests;
 using Moq;
 using Moq.Protected;
@@ -38,7 +39,7 @@ public static class MockExtensions
 		/// <summary>
 		/// Verifies that the command responded to the user with an embed that satisfies the specified <paramref name="verifier"/>.
 		/// </summary>
-		/// <typeparam name="T">The type of command. Must implement <see cref="InteractionModuleBase&lt;T&gt;"/>.</typeparam>
+		/// <typeparam name="T">The type of command. Must implement <see cref="InteractionModuleBase{T}"/>.</typeparam>
 		/// <param name="verifier">An <see cref="EmbedVerifier"/> instance to verify against.</param>
 		/// <param name="format">An optional message format, if present. Defaults to null.</param>
 		/// <param name="partial">An optional flag indicating whether partial matches are acceptable. Defaults to false.</param>

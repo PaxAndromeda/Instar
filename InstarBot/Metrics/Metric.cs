@@ -5,7 +5,6 @@ namespace PaxAndromeda.Instar.Metrics;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public enum Metric
 {
-
 	[MetricName("Schedule Deviation")]
 	ScheduledService_ScheduleDeviation,
 
@@ -51,6 +50,10 @@ public enum Metric
 	[MetricDimension("Service", "Auto Member System")]
 	[MetricName("AMH Application Failures")]
 	AMS_AMHFailures,
+	
+	[MetricDimension("Service", "Auto Member System")]
+	[MetricName("Autokicks due to Forbidden Roles")]
+	AMS_ForbiddenRoleKicks,
 
 	[MetricDimension("Service", "Birthday System")]
 	[MetricName("Birthday System Failures")]
@@ -82,5 +85,25 @@ public enum Metric
 
 	[MetricDimension("Service", "Gaius")]
 	[MetricName("Gaius API Latency")]
-	Gaius_APILatency
+	Gaius_APILatency,
+
+	[MetricDimension("Service", "Notifications")]
+	[MetricName("Malformed Notifications")]
+	Notification_MalformedNotification,
+
+	[MetricDimension("Service", "Notifications")]
+	[MetricName("Notifications Failed")]
+	Notification_NotificationsFailed,
+
+	[MetricDimension("Service", "Notifications")]
+	[MetricName("Notifications Sent")]
+	Notification_NotificationsSent,
+
+	[MetricDimension("Service", "Time")]
+	[MetricName("NTP Query Errors")]
+	NTP_Error,
+
+	[MetricDimension("Service", "Time")]
+	[MetricName("Clock Drift (µs)")]
+	NTP_Drift,
 }

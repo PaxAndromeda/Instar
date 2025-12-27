@@ -3,7 +3,6 @@ using InstarBot.Test.Framework;
 using InstarBot.Test.Framework.Models;
 using Moq;
 using PaxAndromeda.Instar;
-using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.Services;
 using Xunit;
 using Metric = PaxAndromeda.Instar.Metrics.Metric;

@@ -67,7 +67,7 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
         {
             await _pollSemaphore.WaitAsync();
             if (_timeProvider.GetUtcNow().UtcDateTime > _nextPollTime)
-                await Poll(false);
+                await Poll();
 
             return _current;
         }
@@ -100,10 +100,12 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
         });
 
         _nextToken = configSession.InitialConfigurationToken;
-        await Poll(true);
+        await Poll();
     }
 
-    private async Task Poll(bool bypass)
+	private const string ServiceName = "Dynamic Config";
+
+    private async Task Poll()
     {
         try
         {
@@ -114,23 +116,23 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
 
             _nextToken = result.NextPollConfigurationToken;
             _nextPollTime = _timeProvider.GetUtcNow().UtcDateTime + TimeSpan.FromSeconds((double)(result.NextPollIntervalInSeconds ?? 60));
-            
-            // Per the documentation, if VersionLabel is empty, then the client
-            // has the most up-to-date configuration already stored.  We can stop
-            // here.
-            if (!bypass && string.IsNullOrEmpty(result.VersionLabel))
-                return;
 
-            if (!string.IsNullOrEmpty(result.VersionLabel))
-                Log.Information("Downloading latest configuration version {ConfigVersion} from AppConfig...", result.VersionLabel);
-            else
-                Log.Information("Downloading latest configuration from AppConfig...");
+			Log.Debug("[{ServiceName}] Next polling time: {NextPollTime}", ServiceName, _nextPollTime);
+
+			// Per the documentation, if configuration is empty, then the client
+			// has the most up-to-date configuration already stored.  We can stop
+			// here.
+			if (result.Configuration is null)
+			{
+				Log.Verbose("[{ServiceName}] No new configuration is available.", ServiceName);
+				return;
+			}
 
             _configData = Encoding.UTF8.GetString(result.Configuration.ToArray());
             _current = JsonConvert.DeserializeObject<InstarDynamicConfiguration>(_configData) ??
                        throw new ConfigurationException("Failed to parse configuration");
             
-            Log.Information("Done downloading latest configuration!");
+			Log.Information("[{ServiceName}] New configuration downloaded from AppConfig!", ServiceName);
         }
         catch (Exception ex)
         {

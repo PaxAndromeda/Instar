@@ -14,29 +14,12 @@ namespace InstarBot.Tests.Integration.Interactions;
 
 public static class CheckEligibilityCommandTests
 {
-	private const ulong MemberRole = 793611808372031499ul;
-	private const ulong NewMemberRole = 796052052433698817ul;
-
-	private static async Task<TestOrchestrator> SetupOrchestrator(MembershipEligibility eligibility)
+	private static TestOrchestrator SetupOrchestrator(MembershipEligibility eligibility)
 	{
 		var orchestrator = TestOrchestrator.Default;
 
 		TestAutoMemberSystem tams = (TestAutoMemberSystem) orchestrator.GetService<IAutoMemberSystem>();
 		tams.Mock.Setup(n => n.CheckEligibility(It.IsAny<InstarDynamicConfiguration>(), It.IsAny<IGuildUser>())).Returns(eligibility);
-
-		/*if (context.IsAMH)
-		{
-			var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Actor.Id);
-			dbUser.Should().NotBeNull();
-			dbUser.Data.AutoMemberHoldRecord = new AutoMemberHoldRecord
-			{
-				Date = DateTime.UtcNow,
-				ModeratorID = Snowflake.Generate(),
-				Reason = "Testing"
-			};
-
-			await dbUser.CommitAsync();
-		}*/
 
 		return orchestrator;
 	}
@@ -53,7 +36,7 @@ public static class CheckEligibilityCommandTests
 	public static async Task CheckEligibilityCommand_WithExistingMember_ShouldEmitValidMessage()
 	{
 		// Arrange
-		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var orchestrator = SetupOrchestrator(MembershipEligibility.Eligible);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.MemberRoleID);
@@ -69,7 +52,7 @@ public static class CheckEligibilityCommandTests
 	public static async Task CheckEligibilityCommand_NoMemberRoles_ShouldEmitValidErrorMessage()
 	{
 		// Arrange
-		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var orchestrator = SetupOrchestrator(MembershipEligibility.Eligible);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		// Act
@@ -88,7 +71,7 @@ public static class CheckEligibilityCommandTests
 			.WithDescription(Strings.Command_CheckEligibility_MessagesEligibility)
 			.Build();
 
-		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var orchestrator = SetupOrchestrator(MembershipEligibility.Eligible);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
@@ -112,7 +95,7 @@ public static class CheckEligibilityCommandTests
 			.WithField(Strings.Command_CheckEligibility_AMH_ContactStaff)
 			.Build();
 		
-		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var orchestrator = SetupOrchestrator(MembershipEligibility.Eligible);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
@@ -145,7 +128,7 @@ public static class CheckEligibilityCommandTests
 			.WithDescription(Strings.Command_CheckEligibility_MessagesEligibility)
 			.Build();
 
-		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var orchestrator = SetupOrchestrator(MembershipEligibility.Eligible);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
@@ -199,7 +182,7 @@ public static class CheckEligibilityCommandTests
 			.WithField(testFieldMap, true)
 			.Build();
 
-		var orchestrator = await SetupOrchestrator(eligibility);
+		var orchestrator = SetupOrchestrator(eligibility);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		await orchestrator.Actor.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
@@ -216,7 +199,7 @@ public static class CheckEligibilityCommandTests
 	{
 		// Arrange
 
-		var orchestrator = await SetupOrchestrator(MembershipEligibility.Eligible);
+		var orchestrator = SetupOrchestrator(MembershipEligibility.Eligible);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
@@ -237,7 +220,7 @@ public static class CheckEligibilityCommandTests
 	public static async Task CheckOtherEligibility_WithIneligibleMember_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var orchestrator = await SetupOrchestrator(MembershipEligibility.MissingRoles);
+		var orchestrator = SetupOrchestrator(MembershipEligibility.MissingRoles);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.NewMemberRoleID);
@@ -258,7 +241,7 @@ public static class CheckEligibilityCommandTests
 	public static async Task CheckOtherEligibility_WithAMHedMember_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var orchestrator = await SetupOrchestrator(MembershipEligibility.MissingRoles);
+		var orchestrator = SetupOrchestrator(MembershipEligibility.MissingRoles);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		var verifier = CreateVerifier()
@@ -292,13 +275,13 @@ public static class CheckEligibilityCommandTests
 	public static async Task CheckOtherEligibility_WithDynamoError_ShouldEmitValidEmbed()
 	{
 		// Arrange
-		var orchestrator = await SetupOrchestrator(MembershipEligibility.MissingRoles);
+		var orchestrator = SetupOrchestrator(MembershipEligibility.MissingRoles);
 		var cmd = orchestrator.GetCommand<CheckEligibilityCommand>();
 
 		if (orchestrator.Database is not IMockOf<IDatabaseService> dbMock)
 			throw new InvalidOperationException("This test depends on the registered database implementing IMockOf<IDatabaseService>");
 
-		dbMock.Mock.Setup(n => n.GetOrCreateUserAsync(It.Is<IGuildUser>(n => n.Id == orchestrator.Subject.Id))).Throws<BadStateException>();
+		dbMock.Mock.Setup(n => n.GetOrCreateUserAsync(It.Is<IGuildUser>(guildUser => guildUser.Id == orchestrator.Subject.Id))).Throws<BadStateException>();
 
 		var verifier = CreateVerifier()
 			.WithDescription(Strings.Command_Eligibility_IneligibleText)

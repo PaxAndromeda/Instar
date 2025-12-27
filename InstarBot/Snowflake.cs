@@ -32,6 +32,8 @@ public sealed record Snowflake
 {
     private static int _increment;
 
+	public static readonly DateTime Epoch = new(2015, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
     /// <summary>
     /// The Discord epoch, defined as the first second of the year 2015.
     /// </summary>

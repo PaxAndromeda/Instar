@@ -1,12 +1,10 @@
-﻿using Discord;
-using InstarBot.Test.Framework.Models;
+﻿using InstarBot.Test.Framework.Models;
 using InstarBot.Test.Framework.Services;
+using JetBrains.Annotations;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using PaxAndromeda.Instar;
-using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.Services;
-using InvalidOperationException = Amazon.CloudWatchLogs.Model.InvalidOperationException;
 
 namespace InstarBot.Test.Framework;
 
@@ -16,15 +14,13 @@ public class TestServiceProviderBuilder
 
 	private readonly Dictionary<Type, object> _serviceRegistry = new();
 	private readonly Dictionary<Type, Type> _serviceTypeRegistry = new();
-	private readonly HashSet<Type> _componentRegistry = new();
 	private string _configPath = DefaultConfigPath;
-	private TestDiscordContextBuilder? _discordContextBuilder = null;
-	private TestDatabaseContextBuilder? _databaseContextBuilder = null;
-	private readonly Dictionary<Type, Snowflake> _interactionCallerIds = new();
+	private TestDiscordContextBuilder? _discordContextBuilder;
 	private Snowflake _actor = Snowflake.Generate();
 
 	private TestGuildUser _subject = new(Snowflake.Generate());
 
+	[UsedImplicitly]
 	public TestServiceProviderBuilder WithConfigPath(string configPath)
 	{
 		_configPath = configPath;
@@ -59,13 +55,6 @@ public class TestServiceProviderBuilder
 		return this;
 	}
 
-	public TestServiceProviderBuilder WithDatabase(Func<TestDatabaseContextBuilder, TestDatabaseContextBuilder> builderExpr)
-	{
-		_databaseContextBuilder ??= new TestDatabaseContextBuilder(ref _discordContextBuilder);
-		_databaseContextBuilder = builderExpr(_databaseContextBuilder);
-		return this;
-	}
-
 	public TestServiceProviderBuilder WithActor(Snowflake userId)
 	{
 		_actor = userId;
@@ -85,8 +74,6 @@ public class TestServiceProviderBuilder
 			services.AddSingleton(type, implementation);
 		foreach (var (iType, implType) in _serviceTypeRegistry)
 			services.AddSingleton(iType, implType);
-		foreach (var type in _componentRegistry)
-			services.AddTransient(type);
 
 		IDynamicConfigService configService;
 		if (_serviceRegistry.TryGetValue(typeof(IDynamicConfigService), out var registeredService) &&
@@ -107,6 +94,7 @@ public class TestServiceProviderBuilder
 		RegisterDefaultService<IMetricService, TestMetricService>(services);
 		RegisterDefaultService<IAutoMemberSystem, TestAutoMemberSystem>(services);
 		RegisterDefaultService<IBirthdaySystem, BirthdaySystem>(services);
+		RegisterDefaultService<INotificationService, NotificationService>(services);
 		RegisterDefaultService<TeamService>(services);
 
 		return new TestOrchestrator(services.BuildServiceProvider(), _actor, _subject);

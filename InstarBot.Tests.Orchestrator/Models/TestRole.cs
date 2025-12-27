@@ -39,7 +39,7 @@ public sealed class TestRole : IMockOf<IRole>, IRole
     public bool IsHoisted { get; set; } = false;
     public bool IsManaged { get; set; } = false;
     public bool IsMentionable { get; set; } = false;
-    public string Name { get; set; } = null!;
+    public string Name { get; init; } = null!;
     public string Icon { get; set; } = null!;
     public Emoji Emoji { get; set; } = null!;
     public GuildPermissions Permissions { get; set; } = default!;

@@ -1,3 +1,4 @@
+using JetBrains.Annotations;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Caching;
@@ -15,17 +16,20 @@ public sealed class MemoryCache<T> : MemoryCache, IEnumerable<KeyValuePair<strin
     {
     }
 
-    public bool Add(string key, T value, DateTimeOffset absoluteExpiration, string regionName = null!)
+	[UsedImplicitly]
+	public bool Add(string key, T value, DateTimeOffset absoluteExpiration, string regionName = null!)
     {
         return value != null && base.Add(key, value, absoluteExpiration, regionName);
     }
 
-    public bool Add(string key, T value, CacheItemPolicy policy, string regionName = null!)
+	[UsedImplicitly]
+	public bool Add(string key, T value, CacheItemPolicy policy, string regionName = null!)
     {
         return value != null && base.Add(key, value, policy, regionName);
     }
 
-    public new T Get(string key, string regionName = null!)
+	[UsedImplicitly]
+	public new T Get(string key, string regionName = null!)
     {
         return (T) base.Get(key, regionName) ?? throw new InvalidOperationException($"{nameof(key)} cannot be null");
     }

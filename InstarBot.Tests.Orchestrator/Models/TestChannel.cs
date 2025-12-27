@@ -3,7 +3,6 @@ using InstarBot.Tests;
 using Moq;
 using PaxAndromeda.Instar;
 using System.Diagnostics.CodeAnalysis;
-using InvalidOperationException = Amazon.CloudWatchLogs.Model.InvalidOperationException;
 using MessageProperties = Discord.MessageProperties;
 
 #pragma warning disable CS1998
@@ -12,22 +11,16 @@ using MessageProperties = Discord.MessageProperties;
 namespace InstarBot.Test.Framework.Models;
 
 [SuppressMessage("ReSharper", "ReplaceAutoPropertyWithComputedProperty")]
-public sealed class TestChannel : IMockOf<ITextChannel>, ITextChannel
+public sealed class TestChannel (Snowflake id) : IMockOf<ITextChannel>, ITextChannel
 {
-    public ulong Id { get; }
-    public DateTimeOffset CreatedAt { get; }
+    public ulong Id { get; } = id;
+    public DateTimeOffset CreatedAt { get; } = id.Time;
 
-	public Mock<ITextChannel> Mock { get; } = new();
+    public Mock<ITextChannel> Mock { get; } = new();
 
 	private readonly Dictionary<Snowflake, TestMessage> _messages = new();
 
 	public IEnumerable<TestMessage> Messages => _messages.Values;
-
-	public TestChannel(Snowflake id)
-	{
-		Id = id;
-		CreatedAt = id.Time;
-	}
 
 	public void VerifyMessage(string format, bool partial = false)
 	{
@@ -250,7 +243,8 @@ public sealed class TestChannel : IMockOf<ITextChannel>, ITextChannel
 
     public Task ModifyAsync(Action<GuildChannelProperties> func, RequestOptions options = null)
     {
-	    return ((IGuildChannel)Mock).ModifyAsync(func, options);
+	    // ReSharper disable once SuspiciousTypeConversion.Global
+	    return ((IGuildChannel) Mock).ModifyAsync(func, options);
     }
 
     public OverwritePermissions? GetPermissionOverwrite(IRole role)
@@ -305,11 +299,13 @@ public sealed class TestChannel : IMockOf<ITextChannel>, ITextChannel
 
     IAsyncEnumerable<IReadOnlyCollection<IUser>> IChannel.GetUsersAsync(CacheMode mode  , RequestOptions options  )
     {
+	    // ReSharper disable once SuspiciousTypeConversion.Global
 	    return ((IChannel)Mock).GetUsersAsync(mode, options);
     }
 
     Task<IUser> IChannel.GetUserAsync(ulong id, CacheMode mode  , RequestOptions options  )
     {
+	    // ReSharper disable once SuspiciousTypeConversion.Global
 	    return ((IChannel)Mock).GetUserAsync(id, mode, options);
     }
 

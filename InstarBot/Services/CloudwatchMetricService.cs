@@ -1,17 +1,17 @@
-using System.Collections.Specialized;
-using System.Net;
 using Amazon;
 using Amazon.CloudWatch;
 using Amazon.CloudWatch.Model;
 using Amazon.Runtime;
+using JetBrains.Annotations;
 using Microsoft.Extensions.Configuration;
-using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Metrics;
 using Serilog;
+using System.Net;
 using Metric = PaxAndromeda.Instar.Metrics.Metric;
 
 namespace PaxAndromeda.Instar.Services;
 
+[UsedImplicitly]
 public sealed class CloudwatchMetricService : IMetricService
 {
 	// Exponential backoff parameters

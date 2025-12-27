@@ -23,15 +23,15 @@ public static class PageCommandTests
 
 		return orchestrator;
     }
-
-	public static async IAsyncEnumerable<Team> GetTeams(TestOrchestrator orchestrator, PageTarget pageTarget)
-	{
+    
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+	private static async IAsyncEnumerable<Team> GetTeams(TestOrchestrator orchestrator, PageTarget pageTarget)
+    {
 		var teamsConfig = orchestrator.Configuration.Teams.ToDictionary(n => n.InternalID, n => n);
 
 		teamsConfig.Should().NotBeNull();
 
-		var teamRefs = pageTarget.GetAttributesOfType<TeamRefAttribute>()?.Select(n => n.InternalID) ??
-					   [];
+		var teamRefs = pageTarget.GetAttributesOfType<TeamRefAttribute>()?.Select(n => n.InternalID) ?? [];
 
 		foreach (var internalId in teamRefs)
 		{
@@ -41,6 +41,7 @@ public static class PageCommandTests
 			yield return value;
 		}
 	}
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
 	private static Snowflake GetTeamRole(TestOrchestrator orchestrator, PageTarget owner)
 	{

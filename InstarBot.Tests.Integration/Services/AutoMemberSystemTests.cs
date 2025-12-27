@@ -2,16 +2,13 @@
 using InstarBot.Test.Framework;
 using InstarBot.Test.Framework.Models;
 using InstarBot.Test.Framework.Services;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using PaxAndromeda.Instar;
-using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Gaius;
 using PaxAndromeda.Instar.Modals;
 using PaxAndromeda.Instar.Services;
 using Xunit;
-using static Microsoft.ApplicationInsights.MetricDimensionNames.TelemetryContext;
 
 namespace InstarBot.Tests.Integration.Services;
 
@@ -41,19 +38,24 @@ public static class AutoMemberSystemTests
 
 		if (context.PostedIntroduction)
 		{
-			TestChannel introChannel = (TestChannel) await orchestrator.Discord.GetChannel(orchestrator.Configuration.AutoMemberConfig.IntroductionChannel);
+			if (await orchestrator.Discord.GetChannel(orchestrator.Configuration.AutoMemberConfig.IntroductionChannel) is not TestChannel introChannel)
+				throw new InvalidOperationException("Introduction channel was not TestChannel");
+
 			introChannel.AddMessage(orchestrator.Subject, "Some introduction");
 		}
 		
 		for (var i = 0; i < context.MessagesLast24Hours; i++)
 			channel.AddMessage(orchestrator.Subject, "Some text");
 
+		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
+		if (dbUser is null)
+			throw new InvalidOperationException($"Database entry for user {orchestrator.Subject.Id} did not automatically populate");
+
 		if (context.GrantedMembershipBefore)
-		{
-			var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
 			dbUser.Data.Position = InstarUserPosition.Member;
-			await dbUser.CommitAsync();
-		}
+
+		dbUser.Data.Joined = (orchestrator.TimeProvider.GetUtcNow() - TimeSpan.FromHours(context.FirstJoinTime)).UtcDateTime;
+		await dbUser.CommitAsync();
 
 		if (context.GaiusInhibited)
 		{
@@ -267,7 +269,6 @@ public static class AutoMemberSystemTests
             .Joined(TimeSpan.FromHours(36))
             .SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
             .HasPostedIntroduction()
-            .HasBeenWarned()
             .WithMessages(100)
             .Build();
 
@@ -300,7 +301,6 @@ public static class AutoMemberSystemTests
 			.Joined(TimeSpan.FromHours(36))
 			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
 			.HasPostedIntroduction()
-			.HasBeenPunished()
 			.WithMessages(100)
 			.Build();
 
@@ -334,7 +334,6 @@ public static class AutoMemberSystemTests
 			.Joined(TimeSpan.FromHours(36))
 			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
 			.HasPostedIntroduction()
-			.HasBeenPunished(true)
 			.WithMessages(100)
 			.Build();
 
@@ -396,7 +395,6 @@ public static class AutoMemberSystemTests
             .Build();
 
 		var orchestrator = await SetupOrchestrator(context);
-		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
 		// Act
 		var service = orchestrator.Discord as TestDiscordService;
@@ -409,7 +407,7 @@ public static class AutoMemberSystemTests
 
         // Assert
         context.AssertMember(orchestrator);
-    }
+	}
 
 	[Fact(DisplayName = "The Dynamo record for a user should be updated when the user's username changes")]
 	public static async Task AutoMemberSystem_MemberMetadataUpdated_ShouldBeReflectedInDynamo()
@@ -419,7 +417,6 @@ public static class AutoMemberSystemTests
 
 		var context = AutoMemberSystemContext.Builder()
 			.Joined(TimeSpan.FromHours(1))
-			.FirstJoined(TimeSpan.FromDays(7))
 			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
 			.HasPostedIntroduction()
 			.HasBeenGrantedMembershipBefore()
@@ -427,7 +424,6 @@ public static class AutoMemberSystemTests
 			.Build();
 
 		var orchestrator = await SetupOrchestrator(context);
-		var ams = orchestrator.GetService<IAutoMemberSystem>();
 
 		// Make sure the user is in the database
 		await orchestrator.Database.CreateUserAsync(InstarUserData.CreateFrom(orchestrator.Subject));
@@ -451,21 +447,69 @@ public static class AutoMemberSystemTests
 		ddbUser.Data.Usernames.Should().Contain(n => n.Data != null && n.Data.Equals(newUsername, StringComparison.Ordinal));
 	}
 
+	[Fact(DisplayName = "The Dynamo record for a user should be updated when the user's username changes")]
+	public static async Task AutoMemberSystem_MemberMetadataUpdated_ShouldKickWithForbiddenRole()
+	{
+		// Arrange
+		const string newUsername = "fred";
+
+		var context = AutoMemberSystemContext.Builder()
+			.Joined(TimeSpan.FromHours(1))
+			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
+			.HasPostedIntroduction()
+			.HasBeenGrantedMembershipBefore()
+			.WithMessages(100)
+			.Build();
+
+		var orchestrator = await SetupOrchestrator(context);
+
+		// Make sure the user is in the database
+		await orchestrator.Database.CreateUserAsync(InstarUserData.CreateFrom(orchestrator.Subject));
+
+		// Act
+		var mds = (TestDiscordService) orchestrator.Discord;
+
+		var newUser = orchestrator.Subject.Clone();
+		newUser.Username = newUsername;
+
+		var autoKickRole = orchestrator.Configuration.AutoKickRoles?.First() ?? throw new BadStateException("This test expects AutoKickRoles to be set");
+		await newUser.AddRoleAsync(autoKickRole);
+
+		newUser.RoleIds.Should().Contain(autoKickRole);
+
+		await mds.TriggerUserUpdated(new UserUpdatedEventArgs(orchestrator.Subject.Id, orchestrator.Subject, newUser));
+
+		// Assert
+		var ddbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
+
+		ddbUser.Should().NotBeNull();
+		ddbUser.Data.Username.Should().Be(newUsername);
+
+		ddbUser.Data.Usernames.Should().NotBeNull();
+		ddbUser.Data.Usernames.Count.Should().Be(2);
+		ddbUser.Data.Usernames.Should().Contain(n => n.Data != null && n.Data.Equals(newUsername, StringComparison.Ordinal));
+
+		newUser.Mock.Verify(n => n.KickAsync(It.IsAny<string>()));
+	}
+
 	[Fact(DisplayName = "A user should be created in DynamoDB if they're eligible for membership but missing in DDB")]
 	public static async Task AutoMemberSystem_MemberEligibleButMissingInDDB_ShouldBeCreatedAndGrantedMembership()
 	{
-
 		// Arrange
 		var context = AutoMemberSystemContext.Builder()
 			.Joined(TimeSpan.FromHours(36))
 			.SetRoles(NewMember, Transfemme, TwentyOnePlus, SheHer)
 			.HasPostedIntroduction()
 			.WithMessages(100)
-			.SuppressDDBEntry()
 			.Build();
 
 		var orchestrator = await SetupOrchestrator(context);
 		var ams = orchestrator.GetService<IAutoMemberSystem>();
+
+		if (orchestrator.Database is not TestDatabaseService tbs)
+			throw new InvalidOperationException("Database was not TestDatabaseService");
+
+		tbs.DeleteUser(orchestrator.Subject.Id);
 
 		// Act
 		await ams.RunAsync();
@@ -481,7 +525,6 @@ public static class AutoMemberSystemTests
         int MessagesLast24Hours,
         int FirstJoinTime,
         bool GrantedMembershipBefore,
-		bool SuppressDDBEntry,
 		bool GaiusInhibited)
     {
         public static AutoMemberSystemContextBuilder Builder() => new();
@@ -514,12 +557,8 @@ public static class AutoMemberSystemTests
         private bool _postedIntroduction;
         private int _messagesLast24Hours;
 		private bool _gaiusAvailable = true;
-		private bool _gaiusPunished;
-		private bool _joinAgeKick;
-		private bool _gaiusWarned;
-        private int _firstJoinTime;
         private bool _grantedMembershipBefore;
-		private bool _suppressDDB;
+		private int _firstJoinTime;
 
 
 		public AutoMemberSystemContextBuilder Joined(TimeSpan timeAgo)
@@ -551,21 +590,7 @@ public static class AutoMemberSystemTests
             _gaiusAvailable = false;
             return this;
         }
-
-        public AutoMemberSystemContextBuilder HasBeenPunished(bool isJoinAgeKick = false)
-        {
-            _gaiusPunished = true;
-			_joinAgeKick = isJoinAgeKick;
-
-			return this;
-        }
-
-        public AutoMemberSystemContextBuilder HasBeenWarned()
-        {
-            _gaiusWarned = true;
-            return this;
-        }
-
+		
         public AutoMemberSystemContextBuilder FirstJoined(TimeSpan hoursAgo)
         {
             _firstJoinTime = (int) Math.Round(hoursAgo.TotalHours);
@@ -578,12 +603,6 @@ public static class AutoMemberSystemTests
             return this;
 		}
 
-		public AutoMemberSystemContextBuilder SuppressDDBEntry()
-		{
-			_suppressDDB = true;
-			return this;
-		}
-
 		public AutoMemberSystemContext Build()
         {
             return new AutoMemberSystemContext(
@@ -593,7 +612,6 @@ public static class AutoMemberSystemTests
                 _messagesLast24Hours,
                 _firstJoinTime,
                 _grantedMembershipBefore,
-				_suppressDDB,
 				_gaiusAvailable);
         }
     }

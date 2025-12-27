@@ -11,10 +11,7 @@ using PaxAndromeda.Instar.Services;
 using Serilog;
 using Serilog.Events;
 using System.Diagnostics.CodeAnalysis;
-using System.Reactive.Subjects;
 using System.Runtime.InteropServices;
-using static Microsoft.ApplicationInsights.MetricDimensionNames.TelemetryContext;
-using BindingFlags = System.Reflection.BindingFlags;
 using InvalidOperationException = Amazon.CloudWatchLogs.Model.InvalidOperationException;
 
 namespace InstarBot.Test.Framework
@@ -44,7 +41,7 @@ namespace InstarBot.Test.Framework
 			}
 		}
 
-		public TestGuildUser Subject { get; set; }
+		public TestGuildUser Subject { get; set; } = null!;
 
 		public Snowflake GuildID => GetService<IDiscordService>().GetGuild().Id;
 
@@ -135,8 +132,6 @@ namespace InstarBot.Test.Framework
 
 		public Mock<T> GetCommand<T>(Func<T> constructor) where T : BaseCommand
 		{
-			var constructors = typeof(T).GetConstructors();
-
 			var mock = new Mock<T>(() => constructor());
 			var executionChannel = Snowflake.Generate();
 

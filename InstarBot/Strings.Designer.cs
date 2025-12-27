@@ -106,6 +106,17 @@ namespace PaxAndromeda.Instar {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The user listed below has their membership withheld for one week. Please review this member and remove the hold if no further justification exists.
+        ///
+        ///No further reminders regarding this user&apos;s hold will be sent..
+        /// </summary>
+        public static string Command_AutoMemberHold_NotificationMessage {
+            get {
+                return ResourceManager.GetString("Command_AutoMemberHold_NotificationMessage", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Membership for user &lt;@{0}&gt; has been withheld. Staff will be notified in one week to review..
         /// </summary>
         public static string Command_AutoMemberHold_Success {
@@ -597,6 +608,15 @@ namespace PaxAndromeda.Instar {
         public static string Embed_BirthdaySystem_Footer {
             get {
                 return ResourceManager.GetString("Embed_BirthdaySystem_Footer", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Instar Notification System.
+        /// </summary>
+        public static string Embed_Notification_Footer {
+            get {
+                return ResourceManager.GetString("Embed_Notification_Footer", resourceCulture);
             }
         }
         

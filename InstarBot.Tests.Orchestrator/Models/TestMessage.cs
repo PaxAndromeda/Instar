@@ -1,11 +1,13 @@
 ﻿using Discord;
+using JetBrains.Annotations;
 using Moq;
 using PaxAndromeda.Instar;
 using MessageProperties = Discord.MessageProperties;
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
 namespace InstarBot.Test.Framework.Models;
 
-public sealed class TestMessage : IMockOf<IUserMessage>, IUserMessage, IMessage
+public sealed class TestMessage : IMockOf<IUserMessage>, IUserMessage
 {
 	public Mock<IUserMessage> Mock { get; } = new();
 
@@ -19,6 +21,7 @@ public sealed class TestMessage : IMockOf<IUserMessage>, IUserMessage, IMessage
 		Content = message;
 	}
 
+	// ReSharper disable UnusedParameter.Local
 	public TestMessage(string text, bool isTTS, Embed? embed, RequestOptions? options, AllowedMentions? allowedMentions, MessageReference? messageReference, MessageComponent? components, ISticker[]? stickers, Embed[]? embeds, MessageFlags? flags, PollProperties? poll)
 	{
 		Id = Snowflake.Generate();
@@ -27,6 +30,8 @@ public sealed class TestMessage : IMockOf<IUserMessage>, IUserMessage, IMessage
 		Flags = flags;
 
 		var embedList = new List<Embed>();
+		if (embedList == null)
+			throw new ArgumentNullException(nameof(embedList));
 
 		if (embed is not null)
 			embedList.Add(embed);
@@ -73,7 +78,7 @@ public sealed class TestMessage : IMockOf<IUserMessage>, IUserMessage, IMessage
 
 	public MessageType Type => default;
 	public MessageSource Source => default;
-	public bool IsTTS { get; set; }
+	public bool IsTTS { get;  }
 
 	public bool IsPinned => false;
 	public bool IsSuppressed => false;
@@ -82,7 +87,7 @@ public sealed class TestMessage : IMockOf<IUserMessage>, IUserMessage, IMessage
 	public string CleanContent => null!;
 	public DateTimeOffset Timestamp { get; }
 	public DateTimeOffset? EditedTimestamp => null;
-	public IMessageChannel Channel { get; set; } = null!;
+	public IMessageChannel Channel { get; init; } = null!;
 	public IUser Author { get; }
 	public IThreadChannel Thread => null!;
 	public IReadOnlyCollection<IAttachment> Attachments => null!;
@@ -93,12 +98,12 @@ public sealed class TestMessage : IMockOf<IUserMessage>, IUserMessage, IMessage
 	public IReadOnlyCollection<ulong> MentionedUserIds => null!;
 	public MessageActivity Activity => null!;
 	public MessageApplication Application => null!;
-	public MessageReference Reference { get; set; }
+	public MessageReference? Reference { get;  }
 
 	public IReadOnlyDictionary<IEmote, ReactionMetadata> Reactions => null!;
 	public IReadOnlyCollection<IMessageComponent> Components => null!;
 	public IReadOnlyCollection<IStickerItem> Stickers => null!;
-	public MessageFlags? Flags { get; set; }
+	public MessageFlags? Flags { get; }
 
 	public IMessageInteraction Interaction => null!;
 	public MessageRoleSubscriptionData RoleSubscriptionData => null!;
@@ -143,11 +148,11 @@ public sealed class TestMessage : IMockOf<IUserMessage>, IUserMessage, IMessage
 		return Mock.Object.GetPollAnswerVotersAsync(answerId, limit, afterId, options);
 	}
 
-	public MessageResolvedData ResolvedData { get; set; }
-	public IUserMessage ReferencedMessage { get; set; }
-	public IMessageInteractionMetadata InteractionMetadata { get; set; }
-	public IReadOnlyCollection<MessageSnapshot> ForwardedMessages { get; set; }
-	public Poll? Poll { get; set; }
+	public MessageResolvedData ResolvedData { get; [UsedImplicitly] set; }
+	public IUserMessage ReferencedMessage { get; [UsedImplicitly] set; }
+	public IMessageInteractionMetadata InteractionMetadata { get; [UsedImplicitly] set; }
+	public IReadOnlyCollection<MessageSnapshot> ForwardedMessages { get; [UsedImplicitly] set; }
+	public Poll? Poll { get; [UsedImplicitly] set; }
 	public Task DeleteAsync(RequestOptions? options = null)
 	{
 		return Mock.Object.DeleteAsync(options);

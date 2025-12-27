@@ -4,7 +4,6 @@ using JetBrains.Annotations;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Modals;
 using PaxAndromeda.Instar.Services;
-using System.Threading.Channels;
 
 namespace InstarBot.Test.Framework.Services;
 
@@ -75,9 +74,9 @@ public class TestDiscordService : IDiscordService
 		return Task.FromResult(_guild.Users.AsEnumerable());
 	}
 
-	public Task<IChannel> GetChannel(Snowflake channelId)
+	public Task<IChannel?> GetChannel(Snowflake channelId)
 	{
-		return Task.FromResult<IChannel>(_guild.GetTextChannel(channelId));
+		return Task.FromResult<IChannel?>(_guild.GetTextChannel(channelId));
 	}
 
 	public IAsyncEnumerable<IMessage> GetMessages(IInstarGuild guild, DateTime afterTime)

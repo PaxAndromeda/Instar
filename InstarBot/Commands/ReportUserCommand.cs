@@ -66,22 +66,28 @@ public class ReportUserCommand(IDynamicConfigService dynamicConfig, IMetricServi
         await RespondAsync(Strings.Command_ReportUser_ReportSent, ephemeral: true);
     }
 
-    private async Task SendReportMessage(ReportMessageModal modal, IMessage message, IInstarGuild guild)
-    {
+	private async Task SendReportMessage(ReportMessageModal modal, IMessage message, IInstarGuild guild)
+	{
 		Guard.Against.Null(Context.User);
 
-        var cfg = await dynamicConfig.GetConfig();
-        
+		var cfg = await dynamicConfig.GetConfig();
+
 #if DEBUG
-        const string staffPing = "{{staffping}}";
+		const string staffPing = "{{staffping}}";
 #else
         var staffPing = Snowflake.GetMention(() => cfg.StaffRoleID);
 #endif
 
-        await
-            Context.Guild.GetTextChannel(cfg.StaffAnnounceChannel)
-                .SendMessageAsync(staffPing, embed: new InstarReportUserEmbed(modal, Context.User, message, guild).Build());
+		var announceChannel = Context.Guild.GetTextChannel(cfg.StaffAnnounceChannel);
 
-        await metricService.Emit(Metric.ReportUser_ReportsSent, 1);
-    }
+		if (announceChannel is null)
+		{
+			Log.Error("Could not find staff announce channel by ID {ChannelID}", cfg.StaffAnnounceChannel.ID);
+			return;
+		}
+
+		await announceChannel.SendMessageAsync(staffPing, embed: new InstarReportUserEmbed(modal, Context.User, message, guild).Build());
+
+		await metricService.Emit(Metric.ReportUser_ReportsSent, 1);
+	}
 }

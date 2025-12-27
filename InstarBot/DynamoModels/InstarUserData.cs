@@ -104,13 +104,13 @@ public class InstarUserData
 public record AutoMemberHoldRecord
 {
 	[DynamoDBProperty("date")]
-	public DateTime Date { get; set; }
+	public DateTime Date { get; init; }
 
 	[DynamoDBProperty("mod", Converter = typeof(InstarSnowflakePropertyConverter))]
-	public Snowflake ModeratorID { get; set; }
+	public Snowflake ModeratorID { get; init; }
 
 	[DynamoDBProperty("reason")]
-	public string Reason { get; set; }
+	public string Reason { get; init; }
 }
 
 public interface ITimedEvent
@@ -122,10 +122,10 @@ public interface ITimedEvent
 public record InstarUserDataHistoricalEntry<T> : ITimedEvent
 {
     [DynamoDBProperty("date")]
-    public DateTime Date { get; set; }
+    public DateTime Date { get; [UsedImplicitly] set; }
         
     [DynamoDBProperty("data")]
-    public T? Data { get; set; }
+    public T? Data { get; [UsedImplicitly] set; }
 
     public InstarUserDataHistoricalEntry()
     {
@@ -175,6 +175,7 @@ public record InstarUserDataReports
     public Snowflake Reporter { get; set; }
 }
 
+[UsedImplicitly]
 public record InstarModLogEntry
 {
     [DynamoDBProperty("context")]
@@ -249,7 +250,7 @@ public class InstarEnumPropertyConverter<T> : IPropertyConverter where T : Enum
         return name?.Value ?? "UNKNOWN";
     }
 
-    public object FromEntry(DynamoDBEntry entry)
+    public object? FromEntry(DynamoDBEntry entry)
     {
         var sEntry = entry.AsString();
         if (sEntry is null || string.IsNullOrWhiteSpace(entry.AsString()))

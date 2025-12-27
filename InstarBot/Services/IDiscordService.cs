@@ -23,7 +23,7 @@ public interface IDiscordService
     Task Start(IServiceProvider provider);
     IInstarGuild GetGuild();
     Task<IEnumerable<IGuildUser>> GetAllUsers();
-    Task<IChannel> GetChannel(Snowflake channelId);
+    Task<IChannel?> GetChannel(Snowflake channelId);
     IAsyncEnumerable<IMessage> GetMessages(IInstarGuild guild, DateTime afterTime);
 	IGuildUser? GetUser(Snowflake snowflake);
 	IEnumerable<IGuildUser> GetAllUsersWithRole(Snowflake roleId);

@@ -9,6 +9,6 @@ public interface IInstarGuild
     ulong Id { get; }
     IEnumerable<ITextChannel> TextChannels { get; }
 
-    ITextChannel GetTextChannel(ulong channelId);
-    IRole GetRole(Snowflake newMemberRole);
+    ITextChannel? GetTextChannel(ulong channelId);
+    IRole? GetRole(Snowflake newMemberRole);
 }
