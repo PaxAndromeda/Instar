@@ -11,7 +11,7 @@ using Serilog;
 namespace PaxAndromeda.Instar.Commands;
 
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class AutoMemberHoldCommand(IDatabaseService ddbService, IDynamicConfigService dynamicConfigService, IMetricService metricService, TimeProvider timeProvider) : BaseCommand
+public class AutoMemberHoldCommand(IDatabaseService ddbService, IDynamicConfigService dynamicConfigService, IMetricService metricService, INotificationService notificationService, TimeProvider timeProvider) : BaseCommand
 {
 	[UsedImplicitly]
 	[SlashCommand("amh", "Withhold automatic membership grants to a user.")]
@@ -62,6 +62,30 @@ public class AutoMemberHoldCommand(IDatabaseService ddbService, IDynamicConfigSe
 			};
 			await dbUser.CommitAsync();
 
+			// Create a notification for the future
+			await notificationService.QueueNotification(new Notification
+			{
+				Actor = modId,
+				Channel = config.StaffAnnounceChannel,
+				Type = NotificationType.AutoMemberHold,
+				Priority = NotificationPriority.Normal,
+				Subject = "Auto Member Hold Reminder",
+				Targets = [
+					new NotificationTarget { Id = config.StaffRoleID, Type = NotificationTargetType.Role },
+					new NotificationTarget { Id = modId, Type = NotificationTargetType.User }
+				],
+				Data = new NotificationData
+				{
+					Message = Strings.Command_AutoMemberHold_NotificationMessage,
+					Fields = [
+						new NotificationEmbedField { Name = "**User**", Value = $"<@{user.Id}>\r\n`{user.Id}`", Inline = true },
+						new NotificationEmbedField { Name = "**Issuer**", Value = $"<@{modId.ID}>\r\n`{modId.ID}`", Inline = true },
+						new NotificationEmbedField { Name = "**Reason**", Value = $"```{reason}```" }
+					]
+				},
+				ReferenceUser = user.Id
+			}, TimeSpan.FromDays(7));
+
 			// TODO: configurable duration?
 			await RespondAsync(string.Format(Strings.Command_AutoMemberHold_Success, user.Id), ephemeral: true);
 		} catch (Exception ex)
@@ -108,6 +132,9 @@ public class AutoMemberHoldCommand(IDatabaseService ddbService, IDynamicConfigSe
 			dbUser.Data.AutoMemberHoldRecord = null;
 			await dbUser.CommitAsync();
 
+			// Purge any pending notifications asynchronously.
+			_ = Task.Factory.StartNew(() => PurgeNotification(user.Id));
+
 			await RespondAsync(string.Format(Strings.Command_AutoMemberUnhold_Success, user.Id), ephemeral: true);
 		}
 		catch (Exception ex)
@@ -123,6 +150,23 @@ public class AutoMemberHoldCommand(IDatabaseService ddbService, IDynamicConfigSe
 			{
 				// swallow the exception
 			}
+		}
+	}
+
+	private async Task PurgeNotification(Snowflake userId)
+	{
+		try
+		{
+			var results = await ddbService.GetNotificationsByTypeAndReferenceUser(NotificationType.AutoMemberHold, userId);
+
+			foreach (var result in results)
+			{
+				Log.Debug("Deleting AMH notification for {UserID} dated {Date}", userId.ID, result.Data.Date);
+				await result.DeleteAsync();
+			}
+		} catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to remove AMH notification for user {UserID}", userId.ID);
 		}
 	}
 }

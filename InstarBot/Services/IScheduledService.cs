@@ -1,5 +1,3 @@
 ﻿namespace PaxAndromeda.Instar.Services;
 
-public interface IScheduledService : IStartableService, IRunnableService
-{
-}
+public interface IScheduledService : IStartableService, IRunnableService;

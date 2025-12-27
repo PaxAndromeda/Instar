@@ -18,8 +18,9 @@ public sealed class InstarDynamicConfiguration
     [SnowflakeType(SnowflakeType.Role)] public Snowflake StaffRoleID { get; set; } = null!;
     [SnowflakeType(SnowflakeType.Role)] public Snowflake NewMemberRoleID { get; set; } = null!;
     [SnowflakeType(SnowflakeType.Role)] public Snowflake MemberRoleID { get; set; } = null!;
-    public Snowflake[] AuthorizedStaffID { get; set; } = null!;
-    public AutoMemberConfig AutoMemberConfig { get; set; } = null!;
+	public Snowflake[] AuthorizedStaffID { get; set; } = null!;
+	public Snowflake[]? AutoKickRoles { get; set; } = null!;
+	public AutoMemberConfig AutoMemberConfig { get; set; } = null!;
 	public BirthdayConfig BirthdayConfig { get; set; } = null!;
     public Team[] Teams { get; set; } = null!;
     public Dictionary<string, PhraseCommand> FunCommands { get; set; } = null!;
@@ -32,14 +33,14 @@ public class BirthdayConfig
 	public Snowflake BirthdayRole { get; set; } = null!;
 	[SnowflakeType(SnowflakeType.Channel)]
 	public Snowflake BirthdayAnnounceChannel { get; set; } = null!;
-	public int MinimumPermissibleAge { get; set; }
+	public int MinimumPermissibleAge { get; [UsedImplicitly] set; }
 	public List<AgeRoleMapping> AgeRoleMap { get; set; } = null!;
 }
 
 [UsedImplicitly]
 public record AgeRoleMapping
 {
-	public int Age { get; set; }
+	public int Age { get; [UsedImplicitly] set; }
 
 	[SnowflakeType(SnowflakeType.Role)]
 	public Snowflake Role { get; set; } = null!;

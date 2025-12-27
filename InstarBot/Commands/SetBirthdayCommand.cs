@@ -130,7 +130,6 @@ public class SetBirthdayCommand(IDatabaseService ddbService, IDynamicConfigServi
                 birthday.Birthdate, birthday.Birthdate.UtcDateTime);
 
 			// Fourth step: Grant birthday role if the user's birthday is today THEIR time.
-			// TODO: Ensure that a user is granted/removed birthday roles appropriately after setting their birthday IF their birthday is today.
 			if (birthday.IsToday)
 			{
 				// User's birthday is today in their timezone; grant birthday role.
@@ -153,6 +152,12 @@ public class SetBirthdayCommand(IDatabaseService ddbService, IDynamicConfigServi
 	private async Task HandleUnderage(InstarDynamicConfiguration cfg, IGuildUser user, Birthday birthday)
 	{
 		var staffAnnounceChannel = Context.Guild.GetTextChannel(cfg.StaffAnnounceChannel);
+
+		if (staffAnnounceChannel is null)
+		{
+			Log.Error("Could not find staff announce channel by ID {ChannelID}", cfg.StaffAnnounceChannel.ID);
+			return;
+		}
 
 		var warningEmbed = new InstarUnderageUserWarningEmbed(cfg, user, user.RoleIds.Contains(cfg.MemberRoleID), birthday).Build();
 

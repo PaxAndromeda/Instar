@@ -1,9 +1,11 @@
-﻿using System.Reflection;
+﻿using JetBrains.Annotations;
 using PaxAndromeda.Instar.Metrics;
 using Serilog;
+using System.Reflection;
 
 namespace PaxAndromeda.Instar.Services;
 
+[UsedImplicitly]
 public class FileSystemMetricService : IMetricService
 {
 	public FileSystemMetricService()

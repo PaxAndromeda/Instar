@@ -59,14 +59,7 @@ public interface IDatabaseService
 	// TODO: documentation
 	Task<List<InstarDatabaseEntry<Notification>>> GetPendingNotifications();
 
-	/// <summary>
-	/// Creates a new database representation from a provided <paramref name="user"/>.
-	/// </summary>
-	/// <param name="notification">An instance of <see cref="Notification"/>.</param>
-	/// <returns>An instance of <see cref="InstarDatabaseEntry{Notification}"/>.</returns>
-	/// <remarks>
-	///     When a new user is created with this method, it is *not* created in DynamoDB until
-	///     <see cref="InstarDatabaseEntry{Notification}.CommitAsync"/> is called.
-	/// </remarks>
 	Task<InstarDatabaseEntry<Notification>> CreateNotificationAsync(Notification notification);
+
+	Task<List<InstarDatabaseEntry<Notification>>> GetNotificationsByTypeAndReferenceUser(NotificationType type, Snowflake userId);
 }

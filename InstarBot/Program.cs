@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Amazon;
 using Amazon.CloudWatchLogs;
+using CommandLine;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PaxAndromeda.Instar.Commands;
@@ -74,7 +75,9 @@ internal static class Program
 		// Start up other systems
 		List<Task> tasks = [
 			_services.GetRequiredService<IBirthdaySystem>().Start(),
-			_services.GetRequiredService<IAutoMemberSystem>().Start()
+			_services.GetRequiredService<IAutoMemberSystem>().Start(),
+			_services.GetRequiredService<INotificationService>().Start(),
+			_services.GetRequiredService<NTPService>().Start()
 		];
 
 		Task.WaitAll(tasks);
@@ -135,7 +138,9 @@ internal static class Program
 		services.AddSingleton<IAutoMemberSystem, AutoMemberSystem>();
 		services.AddSingleton<IBirthdaySystem, BirthdaySystem>();
 		services.AddSingleton<IDynamicConfigService, AWSDynamicConfigService>();
+		services.AddSingleton<INotificationService, NotificationService>();
 		services.AddSingleton(TimeProvider.System);
+		services.AddSingleton<NTPService>();
 
 #if DEBUG
 		services.AddSingleton<IMetricService, FileSystemMetricService>();

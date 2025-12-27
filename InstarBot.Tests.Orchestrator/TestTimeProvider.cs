@@ -23,6 +23,6 @@ public class TestTimeProvider : TimeProvider
 
 	public override DateTimeOffset GetUtcNow()
 	{
-		return _time is null ? DateTimeOffset.UtcNow : ((DateTimeOffset) _time).ToUniversalTime();
+		return _time?.ToUniversalTime() ?? DateTimeOffset.UtcNow;
 	}
 }

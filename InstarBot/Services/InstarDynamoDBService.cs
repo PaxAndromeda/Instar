@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.Serialization;
 using Amazon;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
@@ -54,9 +55,9 @@ public sealed class InstarDynamoDBService : IDatabaseService
 		return new InstarDatabaseEntry<InstarUserData>(_ddbContext, data);
 	}
 
-	public async Task<InstarDatabaseEntry<Notification>> CreateNotificationAsync(Notification notification)
+	public Task<InstarDatabaseEntry<Notification>> CreateNotificationAsync(Notification notification)
 	{
-		return new InstarDatabaseEntry<Notification>(_ddbContext, notification);
+		return Task.FromResult(new InstarDatabaseEntry<Notification>(_ddbContext, notification));
 	}
 
 	public async Task<List<InstarDatabaseEntry<InstarUserData>>> GetBatchUsersAsync(IEnumerable<Snowflake> snowflakes)
@@ -72,7 +73,7 @@ public sealed class InstarDynamoDBService : IDatabaseService
 
 	public async Task<List<InstarDatabaseEntry<Notification>>> GetPendingNotifications()
 	{
-		var currentTime = _timeProvider.GetUtcNow();
+		var currentTime = _timeProvider.GetUtcNow().UtcDateTime;
 
 		var config = new QueryOperationConfig
 		{
@@ -86,7 +87,7 @@ public sealed class InstarDynamoDBService : IDatabaseService
 				ExpressionAttributeValues = new Dictionary<string, DynamoDBEntry>
 				{
 					[":g"]   = _guildId,
-					[":now"] = currentTime.ToString("O")
+					[":now"] = Utilities.ToDynamoDBCompatibleDateTime(currentTime)
 				}
 			}
 		};
@@ -96,6 +97,39 @@ public sealed class InstarDynamoDBService : IDatabaseService
 		var results = await search.GetRemainingAsync().ConfigureAwait(false);
 
 		return results.Select(u => new InstarDatabaseEntry<Notification>(_ddbContext, u)).ToList();
+	}
+
+	public async Task<List<InstarDatabaseEntry<Notification>>> GetNotificationsByTypeAndReferenceUser(NotificationType type, Snowflake userId)
+	{
+		var attr = type.GetAttributeOfType<EnumMemberAttribute>();
+		if (attr is null)
+			throw new ArgumentException("Notification type enum value must have an EnumMember attribute.", nameof(type));
+
+		var attrVal = attr.Value ?? throw new ArgumentException("Notification type enum value must have an EnumMember attribute with Value defined.", nameof(type));
+
+		var opConfig = new QueryOperationConfig
+		{
+			IndexName = "gsi_type_referenceuser",
+			KeyExpression = new Expression
+			{
+				ExpressionStatement = "guild_id = :g AND #TYPE = :ty AND reference_user = :uid",
+				ExpressionAttributeNames = new Dictionary<string, string>
+				{
+					["#TYPE"] = "type"
+				},
+				ExpressionAttributeValues = new Dictionary<string, DynamoDBEntry>
+				{
+					[":g"]   = _guildId,
+					[":ty"]  = attrVal,
+					[":uid"] = userId.ID.ToString()
+				}
+			}
+		};
+
+		var qry = _ddbContext.FromQueryAsync<Notification>(opConfig);
+		var results = await qry.GetRemainingAsync();
+
+		return results.Select(n => new InstarDatabaseEntry<Notification>(_ddbContext, n)).ToList();
 	}
 
 	public async Task<List<InstarDatabaseEntry<InstarUserData>>> GetUsersByBirthday(DateTimeOffset birthdate, TimeSpan fuzziness)
@@ -125,25 +159,21 @@ public sealed class InstarDynamoDBService : IDatabaseService
 
 		var results = new List<InstarDatabaseEntry<InstarUserData>>();
 
-		foreach (var range in ranges)
+		foreach (var search in ranges.Select(range => new QueryOperationConfig
+		         {
+			         IndexName = "birthdate-gsi",
+			         KeyExpression = new Expression
+			         {
+				         ExpressionStatement = "guild_id = :g AND birthdate BETWEEN :from AND :to",
+				         ExpressionAttributeValues = new Dictionary<string, DynamoDBEntry>
+				         {
+					         [":g"]    = _guildId,
+					         [":from"] = range.From,
+					         [":to"]   = range.To
+				         }
+			         }
+		         }).Select(config => _ddbContext.FromQueryAsync<InstarUserData>(config)))
 		{
-			var config = new QueryOperationConfig
-			{
-				IndexName = "birthdate-gsi",
-				KeyExpression = new Expression
-				{
-					ExpressionStatement = "guild_id = :g AND birthdate BETWEEN :from AND :to",
-					ExpressionAttributeValues = new Dictionary<string, DynamoDBEntry>
-					{
-						[":g"]    = _guildId,
-						[":from"] = range.From,
-						[":to"]   = range.To
-					}
-				}
-			};
-
-			var search = _ddbContext.FromQueryAsync<InstarUserData>(config);
-
 			var page = await search.GetRemainingAsync().ConfigureAwait(false);
 			results.AddRange(page.Select(u => new InstarDatabaseEntry<InstarUserData>(_ddbContext, u)));
 		}

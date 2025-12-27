@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.DocumentModel;
+using JetBrains.Annotations;
 using Newtonsoft.Json;
 
 namespace PaxAndromeda.Instar.DynamoModels;
@@ -46,6 +47,7 @@ public class EventList<T> : IEnumerable<T>
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
+[UsedImplicitly]
 public class EventListPropertyConverter<T> : IPropertyConverter where T: ITimedEvent
 {
     public DynamoDBEntry ToEntry(object value)

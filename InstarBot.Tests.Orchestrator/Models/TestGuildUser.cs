@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using Discord;
-using InstarBot.Tests;
 using Moq;
 using PaxAndromeda.Instar;
 
@@ -12,9 +11,9 @@ namespace InstarBot.Test.Framework.Models;
 [SuppressMessage("ReSharper", "AutoPropertyCanBeMadeGetOnly.Global")]
 public class TestGuildUser : TestUser, IMockOf<IGuildUser>, IGuildUser
 {
-	public Mock<IGuildUser> Mock { get; } = new();
+	public new Mock<IGuildUser> Mock { get; } = new();
 
-    private HashSet<ulong> _roleIds = [ ];
+    private HashSet<ulong> _roleIds;
 
 	public TestGuildUser() : this(Snowflake.Generate(), [ ]) { }
 
@@ -134,19 +133,21 @@ public class TestGuildUser : TestUser, IMockOf<IGuildUser>, IGuildUser
     }
 
     public DateTimeOffset? JoinedAt { get; init; }
-    public string DisplayName { get; set; } = null!;
-    public string Nickname { get; set; } = null!;
+    public string DisplayName => Nickname ?? Username;
+    // ReSharper disable once PropertyCanBeMadeInitOnly.Global
+    public string? Nickname { get; set; }
     public string DisplayAvatarId { get; set; } = null!;
     public string GuildAvatarId { get; set; } = null!;
     public GuildPermissions GuildPermissions { get; set; }
     public IGuild Guild { get; set; } = null!;
-	public ulong GuildId { get; internal set; } = 0;
+	public ulong GuildId { get; internal set; }
     public DateTimeOffset? PremiumSince { get; set; }
 
     public IReadOnlyCollection<ulong> RoleIds
 	{
 		get => _roleIds.AsReadOnly();
-		set => _roleIds = new HashSet<ulong>(value);
+		// ReSharper disable once PropertyCanBeMadeInitOnly.Global
+		set => _roleIds = [..value];
 	}
 
     public bool? IsPending { get; set; }

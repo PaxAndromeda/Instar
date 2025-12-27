@@ -318,6 +318,6 @@ public sealed class DiscordService : IDiscordService
         }
     }
 
-    public async Task<IChannel> GetChannel(Snowflake channelId)
+    public async Task<IChannel?> GetChannel(Snowflake channelId)
         => await _socketClient.GetChannelAsync(channelId);
 }

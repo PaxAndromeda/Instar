@@ -5,5 +5,5 @@ public interface IRunnableService
 	/// <summary>
 	/// Runs the service.
 	/// </summary>
-	Task RunAsync();
+	public Task RunAsync();
 }

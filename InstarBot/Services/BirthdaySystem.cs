@@ -16,6 +16,9 @@ public sealed class BirthdaySystem (
 	TimeProvider timeProvider)
 	: ScheduledService("*/5 * * * *", timeProvider, metricService, "Birthday System"), IBirthdaySystem
 {
+	private readonly TimeProvider _timeProvider = timeProvider;
+	private readonly IMetricService _metricService = metricService;
+
 	/// <summary>
 	/// The maximum age to be considered 'valid' for age role assignment.
 	/// </summary>
@@ -31,12 +34,12 @@ public sealed class BirthdaySystem (
 	public override async Task RunAsync()
 	{
 		var cfg = await dynamicConfig.GetConfig();
-		var currentTime = timeProvider.GetUtcNow().UtcDateTime;
+		var currentTime = _timeProvider.GetUtcNow().UtcDateTime;
 
 		await RemoveBirthdays(cfg, currentTime);
 		var successfulAdds = await GrantBirthdays(cfg, currentTime);
 
-		await metricService.Emit(Metric.BirthdaySystem_Grants, successfulAdds.Count);
+		await _metricService.Emit(Metric.BirthdaySystem_Grants, successfulAdds.Count);
 
 		// Now we can create a happy announcement message
 		if (successfulAdds.Count == 0)
@@ -129,7 +132,7 @@ public sealed class BirthdaySystem (
 		catch (Exception ex)
 		{
 			Log.Error(ex, "Failed to run birthday routine");
-			await metricService.Emit(Metric.BirthdaySystem_Failures, 1);
+			await _metricService.Emit(Metric.BirthdaySystem_Failures, 1);
 			return [ ];
 		}
 

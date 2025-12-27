@@ -36,29 +36,56 @@ public class EmbedVerifier
 		_fields.Add((null, value, partial));
 	}
 
+	private void FailTest(string component, string? expected, string? actual)
+	{
+		Assert.Fail($"""
+
+
+		             Failed to match embed {component}.
+
+		             Expected: '{expected ?? "<null>"}'
+		             Got:      '{actual ?? "<null>"}'
+		             """);
+	}
+	private void FailField(string? expectedName, string? expectedValue)
+	{
+		Assert.Fail($"""
+
+
+		             Failed to find a matching embed field.
+		             
+		             Name:  '{expectedName ?? "<null>"}'
+		             Value: '{expectedValue ?? "<null>"}'
+		             """);
+	}
+
 	public bool Verify(Embed embed)
 	{
 		if (!VerifyString(Title, embed.Title, MatchFlags.HasFlag(EmbedVerifierMatchFlags.PartialTitle)))
 		{
 			Log.Error("Failed to match title:  Expected '{Expected}', got '{Actual}'", Title, embed.Title);
+			FailTest("title", Title, embed.Title);
 			return false;
 		}
 
 		if (!VerifyString(Description, embed.Description, MatchFlags.HasFlag(EmbedVerifierMatchFlags.PartialDescription)))
 		{
 			Log.Error("Failed to match description:  Expected '{Expected}', got '{Actual}'", Description, embed.Description);
+			FailTest("description", Description, embed.Description);
 			return false;
 		}
 
 		if (!VerifyString(AuthorName, embed.Author?.Name, MatchFlags.HasFlag(EmbedVerifierMatchFlags.PartialAuthorName)))
 		{
 			Log.Error("Failed to match author name:  Expected '{Expected}', got '{Actual}'", AuthorName, embed.Author?.Name);
+			FailTest("author", AuthorName, embed.Author?.Name);
 			return false;
 		}
 
 		if (!VerifyString(FooterText, embed.Footer?.Text, MatchFlags.HasFlag(EmbedVerifierMatchFlags.PartialFooterText)))
 		{
 			Log.Error("Failed to match footer text:  Expected '{Expected}', got '{Actual}'", FooterText, embed.Footer?.Text);
+			FailTest("footer", FooterText, embed.Footer?.Text);
 			return false;
 		}
 
@@ -73,6 +100,7 @@ public class EmbedVerifier
 			if (!embedFields.Any(n => VerifyString(name, n.Name, partial) && VerifyString(value, n.Value, partial)))
 			{
 				Log.Error("Failed to match field:  Expected Name '{ExpectedName}', Value '{ExpectedValue}'", name, value);
+				FailField(name, value);
 				return false;
 			}
 		}

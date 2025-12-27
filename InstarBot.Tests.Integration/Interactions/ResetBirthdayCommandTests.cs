@@ -1,15 +1,10 @@
-﻿using Amazon.SimpleSystemsManagement.Model;
-using Discord;
-using FluentAssertions;
+﻿using FluentAssertions;
 using InstarBot.Test.Framework;
 using InstarBot.Test.Framework.Services;
-using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
-using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.DynamoModels;
-using PaxAndromeda.Instar.Services;
 using Xunit;
 using Assert = Xunit.Assert;
 

@@ -1,14 +1,9 @@
 ﻿using Discord;
 using FluentAssertions;
 using InstarBot.Test.Framework;
-using InstarBot.Test.Framework.Models;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Testing.Platform.Extensions.Messages;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
-using PaxAndromeda.Instar.ConfigModels;
-using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Services;
 using Xunit;
 
@@ -16,71 +11,6 @@ namespace InstarBot.Tests.Integration.Interactions;
 
 public static class SetBirthdayCommandTests
 {
-	/*private static async Task<(IDatabaseService, Mock<SetBirthdayCommand>, InstarDynamicConfiguration)> SetupOrchestrator(SetBirthdayContext context, DateTime? timeOverride = null, bool throwError = false)
-	{
-		TestUtilities.SetupLogging();
-
-		var timeProvider = TimeProvider.System;
-		if (timeOverride is not null)
-		{
-			var timeProviderMock = new Mock<TimeProvider>();
-			timeProviderMock.Setup(n => n.GetUtcNow()).Returns(new DateTimeOffset((DateTime) timeOverride));
-			timeProvider = timeProviderMock.Object;
-		}
-
-		var staffAnnounceChannelMock = new Mock<ITextChannel>();
-		var birthdayAnnounceChannelMock = new Mock<ITextChannel>();
-		context.StaffAnnounceChannel = staffAnnounceChannelMock;
-		context.BirthdayAnnounceChannel = birthdayAnnounceChannelMock;
-
-		var ddbService = TestUtilities.GetServices().GetService<IDatabaseService>();
-		var cfgService = TestUtilities.GetDynamicConfiguration();
-		var cfg = await cfgService.GetConfig();
-
-		var guildMock = new Mock<IInstarGuild>();
-		guildMock.Setup(n => n.GetTextChannel(cfg.StaffAnnounceChannel)).Returns(staffAnnounceChannelMock.Object);
-		guildMock.Setup(n => n.GetTextChannel(cfg.BirthdayConfig.BirthdayAnnounceChannel)).Returns(birthdayAnnounceChannelMock.Object);
-
-		var testContext = new TestContext
-		{
-			UserID = context.UserID.ID,
-			Channels =
-			{
-				{ cfg.StaffAnnounceChannel, staffAnnounceChannelMock.Object },
-				{ cfg.BirthdayConfig.BirthdayAnnounceChannel, birthdayAnnounceChannelMock.Object }
-			}
-		};
-
-		var discord = TestUtilities.SetupDiscordService(testContext);
-		if (discord is MockDiscordService mockDiscord)
-		{
-			mockDiscord.Guild = guildMock.Object;
-		}
-
-		var birthdaySystem = new BirthdaySystem(cfgService, discord, ddbService, new MockMetricService(), timeProvider);
-
-		if (throwError && ddbService is MockDatabaseService mockDDB)
-			mockDDB.Setup(n => n.GetOrCreateUserAsync(It.IsAny<IGuildUser>())).Throws<BadStateException>();
-
-		var cmd = TestUtilities.SetupCommandMock(() => new SetBirthdayCommand(ddbService, TestUtilities.GetDynamicConfiguration(), new MockMetricService(), birthdaySystem, timeProvider), testContext);
-
-		await cmd.Object.Context.User!.AddRoleAsync(cfg.NewMemberRoleID);
-
-		cmd.Setup(n => n.Context.User!.GuildId).Returns(TestUtilities.GuildID);
-
-		context.User = cmd.Object.Context.User!;
-
-		cmd.Setup(n => n.Context.Guild).Returns(guildMock.Object);
-
-		((MockDatabaseService) ddbService).Register(InstarUserData.CreateFrom(cmd.Object.Context.User!));
-
-		ddbService.Should().NotBeNull();
-
-		return (ddbService, cmd, cfg);
-	}*/
-
-	private const ulong NewMemberRole = 796052052433698817ul;
-
 	private static async Task<TestOrchestrator> SetupOrchestrator(bool throwError = false)
 	{
 		var orchestrator = TestOrchestrator.Default;
@@ -145,19 +75,12 @@ public static class SetBirthdayCommandTests
 		await cmd.Object.SetBirthday((Month)month, day, year);
 
         // Assert
-        if (month is < 0 or > 12)
-        {
-			cmd.VerifyResponse(Strings.Command_SetBirthday_MonthsOutOfRange, true);
-        }
-        else
-        {
-            var date = new DateTime(year, month, 1); // there's always a 1st of the month
-            var daysInMonth = DateTime.DaysInMonth(year, month);
-
-			// Assert
-			cmd.VerifyResponse(Strings.Command_SetBirthday_DaysInMonthOutOfRange, true);
-        }
-	}
+        cmd.VerifyResponse(
+	        month is < 0 or > 12
+		        ? Strings.Command_SetBirthday_MonthsOutOfRange
+		        // Assert
+		        : Strings.Command_SetBirthday_DaysInMonthOutOfRange, true);
+    }
 
 	[Fact(DisplayName = "Attempting to set a birthday in the future should emit an error message.")]
 	public static async Task SetBirthdayCommand_WithDateInFuture_ShouldReturnError()

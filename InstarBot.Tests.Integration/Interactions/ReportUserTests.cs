@@ -1,5 +1,4 @@
 ﻿using Discord;
-using FluentAssertions;
 using InstarBot.Test.Framework;
 using InstarBot.Test.Framework.Models;
 using Moq;
@@ -12,7 +11,7 @@ namespace InstarBot.Tests.Integration.Interactions;
 
 public static class ReportUserTests
 {
-	private static async Task<TestOrchestrator> SetupOrchestrator(ReportContext context)
+	private static TestOrchestrator SetupOrchestrator(ReportContext context)
 	{
 		var orchestrator = TestOrchestrator.Default;
 
@@ -29,7 +28,7 @@ public static class ReportUserTests
             .WithReason("This is a test report")
             .Build();
 
-		var orchestrator = await SetupOrchestrator(context);
+		var orchestrator = SetupOrchestrator(context);
 		var command = orchestrator.GetCommand<ReportUserCommand>();
 
 		var verifier = EmbedVerifier.Builder()
@@ -42,7 +41,7 @@ public static class ReportUserTests
 			.Build();
 
         // Act
-        await command.Object.HandleCommand(SetupMessageCommandMock(orchestrator, context));
+        await command.Object.HandleCommand(await SetupMessageCommandMock(orchestrator, context));
         await command.Object.ModalResponse(new ReportMessageModal
         {
             ReportReason = context.Reason
@@ -50,8 +49,11 @@ public static class ReportUserTests
 
 		// Assert
 		command.VerifyResponse(Strings.Command_ReportUser_ReportSent, true);
-		
-		((TestChannel) await orchestrator.Discord.GetChannel(orchestrator.Configuration.StaffAnnounceChannel)).VerifyEmbed(verifier, "{@}");
+
+		if (await orchestrator.Discord.GetChannel(orchestrator.Configuration.StaffAnnounceChannel) is not TestChannel testChannel)
+			throw new InvalidOperationException("Channel was not TestChannel");
+
+		testChannel.VerifyEmbed(verifier, "{@}");
     }
 
     [Fact(DisplayName = "Report user function times out if cache expires")]
@@ -62,11 +64,11 @@ public static class ReportUserTests
             .WithReason("This is a test report")
             .Build();
 
-		var orchestrator = await SetupOrchestrator(context);
+		var orchestrator = SetupOrchestrator(context);
 		var command = orchestrator.GetCommand<ReportUserCommand>();
 
 		// Act
-		await command.Object.HandleCommand(SetupMessageCommandMock(orchestrator, context));
+		await command.Object.HandleCommand(await SetupMessageCommandMock(orchestrator, context));
         ReportUserCommand.PurgeCache();
         await command.Object.ModalResponse(new ReportMessageModal
         {
@@ -77,9 +79,11 @@ public static class ReportUserTests
 		command.VerifyResponse(Strings.Command_ReportUser_ReportExpired, true);
     }
 
-    private static IInstarMessageCommandInteraction SetupMessageCommandMock(TestOrchestrator orchestrator, ReportContext context)
-    {
-		TestChannel testChannel = (TestChannel) orchestrator.Guild.GetTextChannel(context.Channel);
+    private static async Task<IInstarMessageCommandInteraction> SetupMessageCommandMock(TestOrchestrator orchestrator, ReportContext context)
+	{
+		if (await orchestrator.Discord.GetChannel(context.Channel) is not TestChannel testChannel)
+			throw new InvalidOperationException("Channel was not TestChannel");
+
 		var message = testChannel.AddMessage(orchestrator.Subject, "Naughty message");
 
 		var socketMessageDataMock = new Mock<IMessageCommandInteractionData>();
@@ -99,12 +103,7 @@ public static class ReportUserTests
 
     private record ReportContext(Snowflake Channel, string Reason)
     {
-        public static ReportContextBuilder Builder()
-        {
-            return new ReportContextBuilder();
-        }
-
-        public Embed? ResultEmbed { get; set; }
+        public static ReportContextBuilder Builder() => new();
     }
 
     private class ReportContextBuilder

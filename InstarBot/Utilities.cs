@@ -152,4 +152,26 @@ public static class Utilities
 	/// <returns>A string containing the UTC month, day, hour, and minute of the Birthdate in the format "MMddHHmm".</returns>
 	public static string ToBirthdateKey(DateTimeOffset dt) =>
 			dt.ToUniversalTime().ToString("MMddHHmm", CultureInfo.InvariantCulture);
+
+	/// <summary>
+	/// A format string for millisecond precision ISO-8601 representations of a DateTime.
+	/// </summary>
+	/// <remarks>
+	///		This constant is aligned with the AWS SDK's equivalent constant located <a href="https://github.com/aws/aws-sdk-net/blob/36d19ba48ea7d935f887a40c1e59e8c2292292db/sdk/src/Core/Amazon.Util/AWSSDKUtils.cs#L157">here.</a>
+	/// </remarks>
+	private const string ISO8601DateFormat = @"yyyy-MM-dd\THH:mm:ss.fff\Z";
+
+	/// <summary>
+	/// Converts a DateTime into a DynamoDB compatible ISO-8601 string.
+	/// </summary>
+	/// <param name="dateTime">The datetime to convert.</param>
+	/// <returns>A millisecond precision ISO-8601 representation of <paramref name="dateTime"/>.</returns>
+	/// <remarks>
+	///		This method is aligned with the AWS SDK's equivalent method located <a href="https://github.com/aws/aws-sdk-net/blob/36d19ba48ea7d935f887a40c1e59e8c2292292db/sdk/src/Services/DynamoDBv2/Custom/Conversion/SchemaV1.cs#L290-L291">here</a>.
+	/// </remarks>
+	public static string ToDynamoDBCompatibleDateTime(DateTime dateTime)
+	{
+		var utc = dateTime.ToUniversalTime();
+		return utc.ToString(ISO8601DateFormat, CultureInfo.InvariantCulture);
+	}
 }

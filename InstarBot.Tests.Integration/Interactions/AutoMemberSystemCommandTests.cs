@@ -15,66 +15,6 @@ namespace InstarBot.Tests.Integration.Interactions;
 
 public static class AutoMemberSystemCommandTests
 {
-	private const ulong NewMemberRole = 796052052433698817ul;
-	private const ulong MemberRole = 793611808372031499ul;
-
-	/*
-	private static async Task<Context> Setup(bool setupAMH = false)
-	{
-		TestUtilities.SetupLogging();
-
-		// This is going to be annoying
-		var userID = Snowflake.Generate();
-		var modID = Snowflake.Generate();
-
-		var mockDDB = new MockDatabaseService();
-		var mockMetrics = new MockMetricService();
-
-		
-
-		var user = new TestGuildUser
-		{
-			Id = userID,
-			Username = "username",
-			JoinedAt = DateTimeOffset.UtcNow,
-			RoleIds = [ NewMemberRole ]
-		};
-
-		var mod = new TestGuildUser
-		{
-			Id = modID,
-			Username = "mod_username",
-			JoinedAt = DateTimeOffset.UtcNow,
-			RoleIds = [MemberRole]
-		};
-
-		await mockDDB.CreateUserAsync(InstarUserData.CreateFrom(user));
-		await mockDDB.CreateUserAsync(InstarUserData.CreateFrom(mod));
-
-		if (setupAMH)
-		{
-			var ddbRecord = await mockDDB.GetUserAsync(userID);
-			ddbRecord.Should().NotBeNull();
-			ddbRecord.Data.AutoMemberHoldRecord = new AutoMemberHoldRecord
-			{
-				Date = DateTime.UtcNow,
-				ModeratorID = modID,
-				Reason = "test reason"
-			};
-			await ddbRecord.CommitAsync();
-		}
-
-		var commandMock = TestUtilities.SetupCommandMock(
-			() => new AutoMemberHoldCommand(mockDDB, TestUtilities.GetDynamicConfiguration(), mockMetrics, TimeProvider.System),
-			new TestContext
-			{
-				UserID = modID
-			});
-
-		return new Context(mockDDB, mockMetrics, user, mod, commandMock);
-	}
-	*/
-
 	[Fact]
 	public static async Task HoldMember_WithValidUserAndReason_ShouldCreateRecord()
 	{
@@ -93,6 +33,18 @@ public static class AutoMemberSystemCommandTests
 		record.Data.AutoMemberHoldRecord.Should().NotBeNull();
 		record.Data.AutoMemberHoldRecord.ModeratorID.ID.Should().Be(orchestrator.Actor.Id);
 		record.Data.AutoMemberHoldRecord.Reason.Should().Be("Test reason");
+
+		if (orchestrator.Database is not TestDatabaseService tds)
+			throw new InvalidOperationException("Expected orchestrator.Database to be TestDatabaseService!");
+
+		var notifications = tds.GetAllNotifications();
+		notifications.Should().ContainSingle();
+
+		var notification = notifications.First();
+		notification.Should().NotBeNull();
+
+		notification.Type.Should().Be(NotificationType.AutoMemberHold);
+		notification.ReferenceUser!.ID.Should().Be(orchestrator.Subject.Id);
 	}
 
 	[Fact]
@@ -149,7 +101,7 @@ public static class AutoMemberSystemCommandTests
 		if (orchestrator.Database is not IMockOf<IDatabaseService> dbMock)
 			throw new InvalidOperationException("This test depends on the registered database implementing IMockOf<IDatabaseService>");
 
-		dbMock.Mock.Setup(n => n.GetOrCreateUserAsync(It.Is<IGuildUser>(n => n.Id == orchestrator.Subject.Id))).Throws<BadStateException>();
+		dbMock.Mock.Setup(n => n.GetOrCreateUserAsync(It.Is<IGuildUser>(guildUser => guildUser.Id == orchestrator.Subject.Id))).Throws<BadStateException>();
 
 		// Act
 		await cmd.Object.HoldMember(orchestrator.Subject, "Test reason");
@@ -173,6 +125,18 @@ public static class AutoMemberSystemCommandTests
 		await orchestrator.CreateAutoMemberHold(orchestrator.Subject);
 		var cmd = orchestrator.GetCommand<AutoMemberHoldCommand>();
 
+		if (orchestrator.Database is not TestDatabaseService tds)
+			throw new InvalidOperationException("Expected orchestrator.Database to be TestDatabaseService!");
+
+		await tds.CreateNotificationAsync(new Notification
+		{
+			Type = NotificationType.AutoMemberHold,
+			ReferenceUser = orchestrator.Subject.Id,
+			Date = (orchestrator.TimeProvider.GetUtcNow() + TimeSpan.FromDays(7)).DateTime
+		});
+
+		tds.GetAllNotifications().Should().ContainSingle();
+
 		// Act
 		await cmd.Object.UnholdMember(orchestrator.Subject);
 
@@ -182,6 +146,21 @@ public static class AutoMemberSystemCommandTests
 		var afterRecord = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
 		afterRecord.Should().NotBeNull();
 		afterRecord.Data.AutoMemberHoldRecord.Should().BeNull();
+
+		// There is a potential asynchronous delay here, so let's keep waiting for this condition for 5 seconds.
+		await Task.WhenAny(
+			Task.Delay(5000),
+			Task.Factory.StartNew(async () =>
+			{
+				while (true)
+				{
+					if (tds.GetAllNotifications().Count == 0)
+						break;
+
+					// only poll once every 50ms
+					await Task.Delay(50);
+				}
+			}));
 	}
 
 	[Fact]
@@ -223,7 +202,7 @@ public static class AutoMemberSystemCommandTests
 		if (orchestrator.Database is not IMockOf<IDatabaseService> dbMock)
 			throw new InvalidOperationException("This test depends on the registered database implementing IMockOf<IDatabaseService>");
 
-		dbMock.Mock.Setup(n => n.GetOrCreateUserAsync(It.Is<IGuildUser>(n => n.Id == orchestrator.Subject.Id))).Throws<BadStateException>();
+		dbMock.Mock.Setup(n => n.GetOrCreateUserAsync(It.Is<IGuildUser>(guildUser => guildUser.Id == orchestrator.Subject.Id))).Throws<BadStateException>();
 
 		// Act
 		await cmd.Object.UnholdMember(orchestrator.Subject);

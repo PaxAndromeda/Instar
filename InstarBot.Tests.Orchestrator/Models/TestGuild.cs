@@ -20,9 +20,9 @@ public class TestGuild : IInstarGuild
 
 	public List<IGuildUser> Users { get; init; } = [];
 
-    public virtual ITextChannel GetTextChannel(ulong channelId)
+    public virtual ITextChannel? GetTextChannel(ulong channelId)
     {
-        return TextChannels.First(n => n.Id.Equals(channelId));
+        return TextChannels.FirstOrDefault(n => n.Id.Equals(channelId));
     }
 
     public virtual IRole? GetRole(Snowflake roleId)

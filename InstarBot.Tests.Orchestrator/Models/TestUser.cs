@@ -2,6 +2,7 @@
 using Discord;
 using Moq;
 using PaxAndromeda.Instar;
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
 namespace InstarBot.Test.Framework.Models;
 
@@ -63,7 +64,7 @@ public class TestUser : IMockOf<IUser>, IUser
 		return Mock.Object.GetDisplayAvatarUrl(format, size);
 	}
 
-	public Task<IDMChannel> CreateDMChannelAsync(RequestOptions options = null)
+	public Task<IDMChannel> CreateDMChannelAsync(RequestOptions? options = null)
 	{
 		return Task.FromResult(DMChannelMock.Object);
 	}
@@ -80,7 +81,7 @@ public class TestUser : IMockOf<IUser>, IUser
 	public bool IsWebhook { get; set; }
 	public string Username { get; set; }
 	public UserProperties? PublicFlags { get; set; }
-	public string GlobalName { get; set; }
+	public string GlobalName { get; init; }
 	public string AvatarDecorationHash { get; set; }
 	public ulong? AvatarDecorationSkuId { get; set; }
 	public PrimaryGuild? PrimaryGuild { get; set; }

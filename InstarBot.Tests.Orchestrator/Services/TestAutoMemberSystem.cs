@@ -1,4 +1,5 @@
 ﻿using Discord;
+using JetBrains.Annotations;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.ConfigModels;
@@ -6,6 +7,7 @@ using PaxAndromeda.Instar.Services;
 
 namespace InstarBot.Test.Framework.Services;
 
+[UsedImplicitly]
 public class TestAutoMemberSystem : IMockOf<IAutoMemberSystem>, IAutoMemberSystem
 {
 	public Mock<IAutoMemberSystem> Mock { get; } = new();

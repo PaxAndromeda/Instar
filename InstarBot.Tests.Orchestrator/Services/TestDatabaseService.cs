@@ -1,57 +1,61 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Amazon.DynamoDBv2.DataModel;
+﻿using Amazon.DynamoDBv2.DataModel;
 using Discord;
+using JetBrains.Annotations;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Services;
+using System.Diagnostics.CodeAnalysis;
 
 namespace InstarBot.Test.Framework.Services;
 
+[UsedImplicitly]
 public class TestDatabaseService : IMockOf<IDatabaseService>, IDatabaseService
 {
+	private readonly IDynamicConfigService _dynamicConfig;
 	private readonly TimeProvider _timeProvider;
 	private readonly Dictionary<Snowflake, InstarUserData> _userDataTable;
 	private readonly Dictionary<DateTime, Notification> _notifications;
-	private readonly Mock<IDynamoDBContext> _contextMock;
 
 	// Although we don't mock anything here, we use this to
 	// throw exceptions if they're configured.
 	public Mock<IDatabaseService> Mock { get; } = new();
 
-	public TestDatabaseService(TimeProvider timeProvider)
+	public Mock<IDynamoDBContext> ContextMock { get; } = new();
+
+	public TestDatabaseService(IDynamicConfigService dynamicConfig, TimeProvider timeProvider)
 	{
+		_dynamicConfig = dynamicConfig;
 		_timeProvider = timeProvider;
 		_userDataTable = new Dictionary<Snowflake, InstarUserData>();
 		_notifications = [];
-		_contextMock = new Mock<IDynamoDBContext>();
 
 		SetupContextMock(_userDataTable, data => data.UserID!);
 		SetupContextMock(_notifications, notif => notif.Date);
 	}
 
-	private void SetupContextMock<T, V>(Dictionary<V, T> mapPointer, Func<T, V> keySelector)
+	private void SetupContextMock<T, V>(Dictionary<V, T> mapPointer, Func<T, V> keySelector) where V : notnull
 	{
-		_contextMock.Setup(n => n.DeleteAsync(It.IsAny<T>())).Callback((T data, CancellationToken _) =>
+		ContextMock.Setup(n => n.DeleteAsync(It.IsAny<T>())).Callback((T data, CancellationToken _) =>
 		{
 			var key = keySelector(data);
 			mapPointer.Remove(key);
 		});
 
-		_contextMock.Setup(n => n.SaveAsync(It.IsAny<T>())).Callback((T data, CancellationToken _) =>
+		ContextMock.Setup(n => n.SaveAsync(It.IsAny<T>())).Callback((T data, CancellationToken _) =>
 		{
 			var key = keySelector(data);
 			mapPointer[key] = data;
 		});
 	}
 
-	public Task<InstarDatabaseEntry<InstarUserData>?> GetUserAsync(Snowflake snowflake)
+	public async Task<InstarDatabaseEntry<InstarUserData>?> GetUserAsync(Snowflake snowflake)
 	{
-		Mock.Object.GetUserAsync(snowflake);
+		await Mock.Object.GetUserAsync(snowflake);
 
 		return !_userDataTable.TryGetValue(snowflake, out var userData)
-			? Task.FromResult<InstarDatabaseEntry<InstarUserData>>(null)
-			: Task.FromResult(new InstarDatabaseEntry<InstarUserData>(_contextMock.Object, userData));
+			? null
+			: new InstarDatabaseEntry<InstarUserData>(ContextMock.Object, userData);
 	}
 
 	public Task<InstarDatabaseEntry<InstarUserData>> GetOrCreateUserAsync(IGuildUser user)
@@ -64,7 +68,7 @@ public class TestDatabaseService : IMockOf<IDatabaseService>, IDatabaseService
 			_userDataTable[user.Id] = userData;
 		}
 
-		return Task.FromResult(new InstarDatabaseEntry<InstarUserData>(_contextMock.Object, userData));
+		return Task.FromResult(new InstarDatabaseEntry<InstarUserData>(ContextMock.Object, userData));
 	}
 
 	[SuppressMessage("ReSharper", "PossibleMultipleEnumeration", Justification = "Doesn't actually enumerate multiple times. First 'enumeration' is a mock which does nothing.")]
@@ -79,7 +83,7 @@ public class TestDatabaseService : IMockOf<IDatabaseService>, IDatabaseService
 				returnList.Add(userData);
 		}
 
-		return Task.FromResult(returnList.Select(data => new InstarDatabaseEntry<InstarUserData>(_contextMock.Object, data)).ToList());
+		return Task.FromResult(returnList.Select(data => new InstarDatabaseEntry<InstarUserData>(ContextMock.Object, data)).ToList());
 	}
 
 	public Task CreateUserAsync(InstarUserData data)
@@ -105,20 +109,22 @@ public class TestDatabaseService : IMockOf<IDatabaseService>, IDatabaseService
 			return userBirthdateThisYear >= startUtc && userBirthdateThisYear <= endUtc;
 		}).ToList();
 
-		return Task.FromResult(matchedUsers.Select(data => new InstarDatabaseEntry<InstarUserData>(_contextMock.Object, data)).ToList());
+		return Task.FromResult(matchedUsers.Select(data => new InstarDatabaseEntry<InstarUserData>(ContextMock.Object, data)).ToList());
 	}
 
-	public Task<List<InstarDatabaseEntry<Notification>>> GetPendingNotifications()
+	public async Task<List<InstarDatabaseEntry<Notification>>> GetPendingNotifications()
 	{
-		Mock.Object.GetPendingNotifications();
+		await Mock.Object.GetPendingNotifications();
 
 		var currentTimeUtc = _timeProvider.GetUtcNow();
 
+		var cfg = await _dynamicConfig.GetConfig();
+
 		var pendingNotifications = _notifications.Values
-			.Where(notification => notification.Date <= currentTimeUtc)
+			.Where(notification => notification.Date <= currentTimeUtc && notification.GuildID == cfg.TargetGuild)
 			.ToList();
 
-		return Task.FromResult(pendingNotifications.Select(data => new InstarDatabaseEntry<Notification>(_contextMock.Object, data)).ToList());
+		return pendingNotifications.Select(data => new InstarDatabaseEntry<Notification>(ContextMock.Object, data)).ToList();
 	}
 
 	public Task<InstarDatabaseEntry<Notification>> CreateNotificationAsync(Notification notification)
@@ -126,6 +132,26 @@ public class TestDatabaseService : IMockOf<IDatabaseService>, IDatabaseService
 		Mock.Object.CreateNotificationAsync(notification);
 
 		_notifications[notification.Date] = notification;
-		return Task.FromResult(new InstarDatabaseEntry<Notification>(_contextMock.Object, notification));
+		return Task.FromResult(new InstarDatabaseEntry<Notification>(ContextMock.Object, notification));
+	}
+
+	public Task<List<InstarDatabaseEntry<Notification>>> GetNotificationsByTypeAndReferenceUser(NotificationType type, Snowflake userId)
+	{
+		return Task.FromResult(
+				_notifications.Values
+					.Where(n => n.Type == type && n.ReferenceUser == userId)
+					.Select(n => new InstarDatabaseEntry<Notification>(ContextMock.Object, n))
+					.ToList()
+			);
+	}
+
+	public List<Notification> GetAllNotifications()
+	{
+		return _notifications.Values.ToList();
+	}
+
+	public void DeleteUser(Snowflake userId)
+	{
+		_userDataTable.Remove(userId);
 	}
 }

@@ -284,10 +284,6 @@
   <data name="Embed_UserReport_Footer" xml:space="preserve">
     <value>Instar Message Reporting System</value>
   </data>
-  <data name="Birthday_Announcement" xml:space="preserve">
-    <value>:birthday: &lt;@&amp;{0}&gt; {1}!</value>
-    <comment>{0} is the ID of the Happy Birthday role, {1} is the list of recipients.</comment>
-  </data>
   <data name="JoiningConjunction" xml:space="preserve">
     <value>and</value>
   </data>
@@ -350,5 +346,17 @@ As the user is a new member, their membership has automatically been withheld pe
   <data name="Command_ResetBirthday_Error_RemoveBirthdayRole" xml:space="preserve">
     <value>Successfully reset the birthday of &lt;@{0}&gt;, but the birthday role could not be automatically removed. The user has been notified of the reset by DM.</value>
     <comment>{0} is the user ID.</comment>
+  </data>
+  <data name="Birthday_Announcement" xml:space="preserve">
+    <value>:birthday: &lt;@&amp;{0}&gt; {1}!</value>
+    <comment>{0} is the ID of the Happy Birthday role, {1} is the list of recipients.</comment>
+  </data>
+  <data name="Embed_Notification_Footer" xml:space="preserve">
+    <value>Instar Notification System</value>
+  </data>
+  <data name="Command_AutoMemberHold_NotificationMessage" xml:space="preserve">
+    <value>The user listed below has their membership withheld for one week. Please review this member and remove the hold if no further justification exists.
+
+No further reminders regarding this user's hold will be sent.</value>
   </data>
 </root>

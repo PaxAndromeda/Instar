@@ -1,9 +1,11 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using JetBrains.Annotations;
 using Moq;
 
 namespace InstarBot.Test.Framework.Models;
 
+[UsedImplicitly]
 public class TestSocketUser : IMockOf<SocketUser>
 {
 	public Mock<SocketUser> Mock { get; } = new();
