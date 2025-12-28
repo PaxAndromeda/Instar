@@ -505,15 +505,36 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 
         var messages = (await introChannel.GetMessagesAsync().FlattenAsync()).GetEnumerator();
 
-        // Assumption:  Last message is the oldest one
-        while (messages.MoveNext()) // Move to the first message, if there is any
-        {
-            IMessage? message;
+		const int MAX_ITERS = 1000;
+
+		int iters = 0;
+		int inner_iters = 0;
+		// Assumption:  Last message is the oldest one
+		while (messages.MoveNext()) // Move to the first message, if there is any
+		{
+			iters++;
+
+			if (iters >= MAX_ITERS)
+			{
+				Log.Error("Watchdog: exiting PreloadIntroductionPosters loop due to iters ({iters}) exceeding 1,000", iters);
+				break;
+			}
+
+			IMessage? message = null;
             IMessage? oldestMessage = null;
 
             do
             {
-                message = messages.Current;
+				inner_iters++;
+				Log.Information("iters={iters}, inner_iters={inner_iters}", iters, inner_iters);
+
+				if (inner_iters >= MAX_ITERS)
+				{
+					Log.Error("Watchdog: exiting PreloadIntroductionPosters loop due to inner_iters ({inner_iters}) exceeding 1,000", inner_iters);
+					break;
+				}
+
+				message = messages.Current;
                 if (message is null)
                     break;
 
