@@ -15,31 +15,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6.0.1
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 6.0.x
+        dotnet-version: '10.0.x'
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
-
-  specflow:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 6.0.x
-    - name: Generate Specflow Tests
-      uses: cryptic-wizard/run-specflow-tests@v1.3.2
-      with:
-        test-assembly-path: InstarBot.Tests.Integration/bin/Release/net6.0
-        test-assembly-dll: InstarBot.Tests.Integration.dll
-        output-html: IntegrationTestResults.html
