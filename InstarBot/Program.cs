@@ -54,10 +54,10 @@ internal static class Program
     private static async void StopSystem(object? sender, ConsoleCancelEventArgs e)
     {
         try
-        {
-            await _services.GetRequiredService<DiscordService>().Stop();
-            await _cts.CancelAsync();
-        }
+		{
+			await _services.GetRequiredService<IDiscordService>().Stop();
+			await _cts.CancelAsync();
+		}
         catch (Exception err)
         {
             Log.Fatal(err, "FATAL: Unhandled exception caught during shutdown");

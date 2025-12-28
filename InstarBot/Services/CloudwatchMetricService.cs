@@ -70,7 +70,10 @@ public sealed class CloudwatchMetricService : IMetricService
 					{
 						// Always prefer the passed-in dimensions over attribute-defined ones when there's a conflict
 						if (!dimensions.ContainsKey(dim.Name))
+						{
 							dimensions.Add(dim.Name, dim.Value);
+							continue;
+						}
 
 						datum.Dimensions.Add(new Dimension
 						{

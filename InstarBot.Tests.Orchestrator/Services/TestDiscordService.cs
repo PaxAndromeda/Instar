@@ -104,6 +104,11 @@ public class TestDiscordService : IDiscordService
 		return Task.CompletedTask;
 	}
 
+	public Task Stop()
+	{
+		return Task.CompletedTask;
+	}
+
 	public void CreateChannel(Snowflake channelId)
 	{
 		_guild.AddChannel(new TestChannel(channelId));

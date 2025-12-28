@@ -28,4 +28,5 @@ public interface IDiscordService
 	IGuildUser? GetUser(Snowflake snowflake);
 	IEnumerable<IGuildUser> GetAllUsersWithRole(Snowflake roleId);
 	Task SyncUsers();
+	Task Stop();
 }
