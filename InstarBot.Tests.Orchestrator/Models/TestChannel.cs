@@ -73,7 +73,15 @@ public sealed class TestChannel (Snowflake id) : IMockOf<ITextChannel>, ITextCha
         RequestOptions options = null)
 	{
 		var snowflake = new Snowflake(fromMessageId);
-		var rz = _messages.Values.Where(n => n.Timestamp.UtcDateTime > snowflake.Time.ToUniversalTime()).ToList().AsReadOnly();
+
+		Func<TestMessage, bool> query = dir switch
+		{
+			Direction.Before => n => n.Id != fromMessageId && n.Timestamp.UtcDateTime > snowflake.Time.ToUniversalTime(),
+			Direction.After => n => n.Id != fromMessageId && n.Timestamp.UtcDateTime < snowflake.Time.ToUniversalTime(),
+			_ => throw new NotImplementedException()
+		};
+
+		var rz = _messages.Values.Where(query).ToList().AsReadOnly();
 
 		yield return rz;
 	}
