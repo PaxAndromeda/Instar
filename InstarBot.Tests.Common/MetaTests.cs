@@ -15,6 +15,7 @@ public static class MetaTests
 
 		result.Should().BeTrue();
 	}
+
 	[Fact]
 	public static void MatchesFormat_WithRegexReservedCharacters_ShouldReturnTrue()
 	{
@@ -24,6 +25,16 @@ public static class MetaTests
 		bool result = TestUtilities.MatchesFormat(text, format);
 
 		result.Should().BeTrue();
+	}
+
+	[Fact]
+	public static void MatchesFormat_WithTemplateNotReplaced_ShouldReturnFalse()
+	{
+		const string text = "Test {0} Test";
+
+		bool result = TestUtilities.MatchesFormat(text, text);
+
+		result.Should().BeFalse();
 	}
 
 	[Theory]

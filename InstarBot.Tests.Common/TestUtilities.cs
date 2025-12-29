@@ -33,8 +33,13 @@ public static class TestUtilities
 		// We cannot simply replace the escaped template variables, as that would escape the braces.
 		formatRegex = formatRegex.Replace("\\{", "{").Replace("\\}", "}");
 
-		// Replaces any template variable (e.g., {0}, {name}, etc.) with a regex wildcard that matches any text.
-		formatRegex = Regex.Replace(formatRegex, "{.+?}", "(?:.+?)");
+		// Replaces any template variable (e.g., {0}, {name}, etc.) with a regex wildcard that matches any text
+		// that is not the original template itself.
+		formatRegex = Regex.Replace(
+			formatRegex,
+			"{(.+?)}",
+			m => "(?:(?!\\{" + Regex.Escape(m.Groups[1].Value) +"\\}).+?)"
+			);
 
 		return Regex.IsMatch(text, formatRegex);
 	}

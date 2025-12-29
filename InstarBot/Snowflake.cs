@@ -218,6 +218,11 @@ public sealed record Snowflake
         return ID == other.ID;
     }
 
+    public override string ToString()
+    {
+		return ID.ToString();
+    }
+
     public override int GetHashCode()
     {
         return ID.GetHashCode();
