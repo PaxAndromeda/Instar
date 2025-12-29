@@ -1,6 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Amazon;
+﻿using Amazon;
 using Amazon.CloudWatchLogs;
+using CommandLine;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PaxAndromeda.Instar.Commands;
@@ -9,10 +9,7 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Json;
 using Serilog.Sinks.AwsCloudWatch;
-
-#if !DEBUG
-using CommandLine;
-#endif
+using System.Diagnostics.CodeAnalysis;
 
 namespace PaxAndromeda.Instar;
 
@@ -31,19 +28,19 @@ internal static class Program
 #if DEBUG
         var configPath = "Config/Instar.debug.conf.json";
 #else
-        var cli = Parser.Default.ParseArguments<CommandLineOptions>(args).Value;
-
         var configPath = "Config/Instar.conf.json";
-        if (!string.IsNullOrEmpty(cli.ConfigPath))
-            configPath = cli.ConfigPath;
 #endif
+
+		var cli = Parser.Default.ParseArguments<CommandLineOptions>(args).Value;
+		if (!string.IsNullOrEmpty(cli.ConfigPath))
+			configPath = cli.ConfigPath;
 
 		Log.Information("Config path is {Path}", configPath);
         IConfiguration config = new ConfigurationBuilder()
             .AddJsonFile(configPath)
             .Build();
         
-        InitializeLogger(config);
+        InitializeLogger(config, cli.LogLevel);
         
         Console.CancelKeyPress += StopSystem;
         await RunAsync(config);
@@ -87,19 +84,11 @@ internal static class Program
 		Task.WaitAll(tasks);
 	}
 
-    private static void InitializeLogger(IConfiguration config)
+    private static void InitializeLogger(IConfiguration config, LogEventLevel? requestedLogLevel)
     {
-#if TRACE
-        const LogEventLevel minLevel = LogEventLevel.Verbose;
-#elif DEBUG
-        const LogEventLevel minLevel = LogEventLevel.Verbose;
-#else
-        const LogEventLevel minLevel = LogEventLevel.Information;
-#endif
-
 		var logCfg = new LoggerConfiguration()
 			.Enrich.FromLogContext()
-			.MinimumLevel.Is(minLevel)
+			.MinimumLevel.Is(requestedLogLevel ?? LogEventLevel.Information)
             .WriteTo.Console();
 
 

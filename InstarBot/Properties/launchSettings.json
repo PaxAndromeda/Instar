@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "InstarBot": {
+      "commandName": "Project",
+      "commandLineArgs": "--level Verbose"
+    }
+  }
+}
