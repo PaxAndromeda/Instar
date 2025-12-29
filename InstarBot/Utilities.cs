@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.Serialization;
 
@@ -173,5 +174,49 @@ public static class Utilities
 	{
 		var utc = dateTime.ToUniversalTime();
 		return utc.ToString(ISO8601DateFormat, CultureInfo.InvariantCulture);
+	}
+
+	/// <summary>
+	/// Returns the ordinal suffix for an integer.
+	/// </summary>
+	/// <param name="integer">The integer.</param>
+	/// <returns>The ordinal suffix of the integer, e.g. <c>"st"</c> if <paramref name="integer"/> is <c>1</c>.</returns>
+	public static string GetOrdinal(int integer)
+	{
+		return (integer % 100) switch
+		{
+			11 or 12 or 13 => "th",
+			_ => (integer % 10) switch
+			{
+				1 => "st",
+				2 => "nd",
+				3 => "rd",
+				_ => "th"
+			}
+		};
+	}
+
+	extension(DateTime dateTime)
+	{
+		public string ToString(string format, bool useExtendedSpecifiers)
+		{
+			return useExtendedSpecifiers
+				? dateTime.ToString(format)
+					.Replace("nn", GetOrdinal(dateTime.Day).ToLower())
+					.Replace("NN", GetOrdinal(dateTime.Day).ToUpper())
+				: dateTime.ToString(format);
+		}
+	}
+
+	extension(DateTimeOffset dateTimeOffset)
+	{
+		public string ToString(string format, bool useExtendedSpecifiers)
+		{
+			return useExtendedSpecifiers
+				? dateTimeOffset.ToString(format)
+					.Replace("nn", GetOrdinal(dateTimeOffset.Day).ToLower())
+					.Replace("NN", GetOrdinal(dateTimeOffset.Day).ToUpper())
+				: dateTimeOffset.ToString(format);
+		}
 	}
 }

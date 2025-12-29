@@ -136,7 +136,10 @@ public class SetBirthdayCommand(IDatabaseService ddbService, IDynamicConfigServi
 				await birthdaySystem.GrantUnexpectedBirthday(Context.User, birthday);
 			}
 
-			await RespondAsync(string.Format(Strings.Command_SetBirthday_Success, birthday.Timestamp), ephemeral: true);
+			var extrapolatedBirthday = birthday.Observed;
+			var dateStr = unspecifiedDate.ToString("MMMM dnn", true);
+
+			await RespondAsync(string.Format(Strings.Command_SetBirthday_Success, dateStr, extrapolatedBirthday.ToUnixTimeSeconds()), ephemeral: true);
             await metricService.Emit(Metric.BS_BirthdaysSet, 1);
         }
         catch (Exception ex)

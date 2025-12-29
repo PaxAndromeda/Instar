@@ -576,7 +576,7 @@ namespace PaxAndromeda.Instar {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Your birthday was set to &lt;t:{0}:F&gt;..
+        ///   Looks up a localized string similar to Your birthday was set to {0}. Your next birthday is &lt;t:{1}:R&gt;..
         /// </summary>
         public static string Command_SetBirthday_Success {
             get {

@@ -318,8 +318,8 @@ As the user is a new member, their membership has automatically been withheld pe
     <comment>{0} is the user birthday timestamp, {1} is the minimum permissible age.</comment>
   </data>
   <data name="Command_SetBirthday_Success" xml:space="preserve">
-    <value>Your birthday was set to &lt;t:{0}:F&gt;.</value>
-    <comment>{0} is the user birthday timestamp</comment>
+    <value>Your birthday was set to {0}. Your next birthday is &lt;t:{1}:R&gt;.</value>
+    <comment>{0} is the date (like "March 1st"), {2} is the timestamp of the user's next birthday.</comment>
   </data>
   <data name="Command_SetBirthday_Error_CouldNotSetBirthday" xml:space="preserve">
     <value>Your birthday could not be set at this time. Please try again later.</value>
