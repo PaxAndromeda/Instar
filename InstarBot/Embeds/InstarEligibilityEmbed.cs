@@ -37,12 +37,17 @@ public class InstarEligibilityEmbed(IGuildUser user, MembershipEligibility eligi
 				.WithValue(BuildEligibilityText(eligibility)));
 		}
 
+		string eligibilityDescription = string.Format(eligibility.HasFlag(MembershipEligibility.Eligible)
+				? Strings.Command_Eligibility_EligibleText
+				: Strings.Command_Eligibility_IneligibleText,
+			user.Id);
+
 		return builder
 			.WithAuthor(new EmbedAuthorBuilder()
 				.WithName(user.Username)
 				.WithIconUrl(user.GetAvatarUrl())
 			)
-			.WithDescription(eligibility.HasFlag(MembershipEligibility.Eligible) ? Strings.Command_Eligibility_EligibleText : Strings.Command_Eligibility_IneligibleText)
+			.WithDescription(eligibilityDescription)
 			.WithFields(fields);
 	}
 
