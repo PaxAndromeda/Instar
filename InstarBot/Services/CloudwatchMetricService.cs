@@ -66,20 +66,9 @@ public sealed class CloudwatchMetricService : IMetricService
 
 				var attrs = metric.GetAttributesOfType<MetricDimensionAttribute>();
 				if (attrs != null)
-					foreach (var dim in attrs)
+					foreach (MetricDimensionAttribute? dim in attrs.Where(dim => !dimensions.ContainsKey(dim.Name)))
 					{
-						// Always prefer the passed-in dimensions over attribute-defined ones when there's a conflict
-						if (!dimensions.ContainsKey(dim.Name))
-						{
-							dimensions.Add(dim.Name, dim.Value);
-							continue;
-						}
-
-						datum.Dimensions.Add(new Dimension
-						{
-							Name = dim.Name,
-							Value = dim.Value
-						});
+						dimensions.Add(dim.Name, dim.Value);
 					}
 
 				foreach (var (dName, dValue) in dimensions)

@@ -104,6 +104,6 @@ public enum Metric
 	NTP_Error,
 
 	[MetricDimension("Service", "Time")]
-	[MetricName("Clock Drift (µs)")]
+	[MetricName("Clock Drift")]
 	NTP_Drift,
 }
