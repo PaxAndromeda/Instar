@@ -44,6 +44,20 @@
               "type": "string"
             }
           }
+        },
+        "AppConfig": {
+          "type": "object",
+          "properties": {
+            "Application": {
+              "type": "string"
+            },
+            "Environment": {
+              "type": "string"
+            },
+            "ConfigurationProfile": {
+              "type": "string"
+            }
+          }
         }
       },
       "required": [

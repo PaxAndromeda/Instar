@@ -1,17 +1,18 @@
 using System.Collections.Concurrent;
 using System.Runtime.Caching;
-using System.Timers;
 using Discord;
 using Discord.WebSocket;
 using PaxAndromeda.Instar.Caching;
 using PaxAndromeda.Instar.ConfigModels;
+using PaxAndromeda.Instar.DynamoModels;
+using PaxAndromeda.Instar.Gaius;
 using PaxAndromeda.Instar.Metrics;
+using PaxAndromeda.Instar.Modals;
 using Serilog;
-using Timer = System.Timers.Timer;
 
 namespace PaxAndromeda.Instar.Services;
 
-public sealed class AutoMemberSystem
+public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 {
     private readonly MemoryCache _ddbCache = new("AutoMemberSystem_DDBCache");
     private readonly MemoryCache<MessageProperties> _messageCache = new("AutoMemberSystem_MessageCache");
@@ -23,9 +24,9 @@ public sealed class AutoMemberSystem
     private readonly IDynamicConfigService _dynamicConfig;
     private readonly IDiscordService _discord;
     private readonly IGaiusAPIService _gaiusApiService;
-    private readonly IInstarDDBService _ddbService;
+    private readonly IDatabaseService _ddbService;
     private readonly IMetricService _metricService;
-    private Timer _timer = null!;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>
     /// Recent messages per the last AMS run
@@ -33,35 +34,55 @@ public sealed class AutoMemberSystem
     private Dictionary<ulong, int>? _recentMessages;
 
     public AutoMemberSystem(IDynamicConfigService dynamicConfig, IDiscordService discord, IGaiusAPIService gaiusApiService,
-        IInstarDDBService ddbService, IMetricService metricService)
+        IDatabaseService ddbService, IMetricService metricService, TimeProvider timeProvider)
+		: base("0 * * * *", timeProvider, metricService, "Auto Member System")
     {
         _dynamicConfig = dynamicConfig;
         _discord = discord;
         _gaiusApiService = gaiusApiService;
         _ddbService = ddbService;
         _metricService = metricService;
+        _timeProvider = timeProvider;
 
         discord.UserJoined += HandleUserJoined;
+		discord.UserLeft += HandleUserLeft;
+		discord.UserUpdated += HandleUserUpdated;
         discord.MessageReceived += HandleMessageReceived;
         discord.MessageDeleted += HandleMessageDeleted;
-
-        Task.Run(Initialize).Wait();
     }
 
-    private async Task Initialize()
+    internal override async Task Initialize()
     {
         var cfg = await _dynamicConfig.GetConfig();
         
-        _earliestJoinTime = DateTime.UtcNow - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumJoinAge);
+        _earliestJoinTime = _timeProvider.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumJoinAge);
         
         await PreloadMessageCache(cfg);
         await PreloadIntroductionPosters(cfg);
 
         if (cfg.AutoMemberConfig.EnableGaiusCheck)
             await PreloadGaiusPunishments();
-
-        StartTimer();
     }
+
+	/// <summary>
+	/// Filters warnings and caselogs to only focus on the ones we care about. For example, we don't
+	/// want to withhold membership from someone who was kicked for having a too new Discord account.
+	/// </summary>
+	/// <param name="warnings">A collection of warnings retrieved from the Gaius API.</param>
+	/// <param name="caselogs">A collection of caselogs retrieved from the Gaius API.</param>
+	/// <returns>A tuple containing the filtered warnings and caselogs, respectively.</returns>
+	/// <exception cref="ArgumentNullException">If <paramref name="warnings"/> or <paramref name="caselogs"/> is null.</exception>
+	private static (IEnumerable<Warning>, IEnumerable<Caselog>) FilterPunishments(IEnumerable<Warning> warnings, IEnumerable<Caselog> caselogs)
+	{
+		if (warnings is null)
+			throw new ArgumentNullException(nameof(warnings));
+		if (caselogs is null)
+			throw new ArgumentNullException(nameof(caselogs));
+
+		var filteredCaselogs = caselogs.Where(n => n is not { Type: CaselogType.Kick, Reason: "Join age punishment" });
+
+		return (warnings, filteredCaselogs);
+	}
 
     private async Task UpdateGaiusPunishments()
     {
@@ -69,12 +90,23 @@ public sealed class AutoMemberSystem
         // a situation where someone was warned exactly 1.000000001
         // hours ago, thus would be missed.  To fix this, we'll
         // bias for an hour and a half ago.
-        var afterTime = DateTime.UtcNow - TimeSpan.FromHours(1.5);
-        
-        foreach (var warning in await _gaiusApiService.GetWarningsAfter(afterTime))
-            _punishedUsers.TryAdd(warning.UserID.ID, true);
-        foreach (var caselog in await _gaiusApiService.GetCaselogsAfter(afterTime))
-            _punishedUsers.TryAdd(caselog.UserID.ID, true);
+        var afterTime = _timeProvider.GetUtcNow().UtcDateTime - TimeSpan.FromHours(1.5);
+
+		try
+		{
+			var (warnings, caselogs) = FilterPunishments(
+				await _gaiusApiService.GetWarningsAfter(afterTime),
+				await _gaiusApiService.GetCaselogsAfter(afterTime));
+
+			foreach (var warning in warnings)
+				_punishedUsers.TryAdd(warning.UserID.ID, true);
+
+			foreach (var caselog in caselogs)
+				_punishedUsers.TryAdd(caselog.UserID.ID, true);
+		} catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to update Gaius punishments.");
+		}
     }
 
     private async Task HandleMessageDeleted(Snowflake arg)
@@ -119,51 +151,111 @@ public sealed class AutoMemberSystem
     {
         var cfg = await _dynamicConfig.GetConfig();
         
-        if (await WasUserGrantedMembershipBefore(user.Id))
+        var dbUser = await _ddbService.GetUserAsync(user.Id);
+        if (dbUser is null)
         {
-            Log.Information("User {UserID} has been granted membership before.  Granting membership again", user.Id);
-            await GrantMembership(cfg, user);
+            // Let's create a new user
+            await _ddbService.CreateUserAsync(InstarUserData.CreateFrom(user));
         }
         else
         {
-            await user.AddRoleAsync(cfg.NewMemberRoleID);
+            switch (dbUser.Data.Position)
+            {
+                case InstarUserPosition.NewMember:
+                case InstarUserPosition.Unknown:
+                    await user.AddRoleAsync(cfg.NewMemberRoleID);
+                    dbUser.Data.Position = InstarUserPosition.NewMember;
+                    await dbUser.CommitAsync();
+                    break;
+                
+                default:
+                    // Yes, they were a member
+                    Log.Information("User {UserID} has been granted membership before.  Granting membership again", user.Id);
+                    await GrantMembership(cfg, user, dbUser);
+                    break;
+            }
         }
         
         await _metricService.Emit(Metric.Discord_UsersJoined, 1);
-    }
+	}
 
-    private void StartTimer()
-    {
-        // Since we can start the bot in the middle of an hour,
-        // first we must determine the time until the next top
-        // of hour.
-        var nextHour = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day,
-            DateTime.UtcNow.Hour, 0, 0).AddHours(1);
-        var millisecondsRemaining = (nextHour - DateTime.UtcNow).TotalMilliseconds;
-        
-        // Start the timer.  In elapsed step, we reset the
-        // duration to exactly 1 hour.
-        _timer = new Timer(millisecondsRemaining);
-        _timer.Elapsed += TimerElapsed;
-        _timer.Start();
-    }
+	private async Task HandleUserLeft(IUser arg)
+	{
+		// TODO: Maybe handle something here later
+		await _metricService.Emit(Metric.Discord_UsersLeft, 1);
+	}
 
-    private async void TimerElapsed(object? sender, ElapsedEventArgs e)
-    {
-        // Ensure the timer's interval is exactly 1 hour
-        _timer.Interval = 60 * 60 * 1000;
+	private async Task HandleUserUpdated(UserUpdatedEventArgs arg)
+	{
+		if (!arg.HasUpdated)
+			return;
 
-        await RunAsync();
-    }
+		var user = await _ddbService.GetUserAsync(arg.ID);
+		if (user is null)
+		{
+			// new user for the database, create from the latest data and return
+			try
+			{
+				await _ddbService.CreateUserAsync(InstarUserData.CreateFrom(arg.After));
+				Log.Information("Created new user {Username} (user ID {UserID})", arg.After.Username, arg.ID);
+			}
+			catch (Exception ex)
+			{
+				Log.Error(ex, "Failed to create user with ID {UserID}, username {Username}", arg.ID, arg.After.Username);
+			}
+
+			return;
+		}
+
+		// Update the record
+		bool changed = false;
+
+		if (arg.Before.Username != arg.After.Username)
+		{
+			user.Data.Username = arg.After.Username;
+			changed = true;
+		}
+
+		if (arg.Before.Nickname != arg.After.Nickname)
+		{
+			user.Data.Nicknames?.Add(new InstarUserDataHistoricalEntry<string>(_timeProvider.GetUtcNow().UtcDateTime, arg.After.Nickname));
+			changed = true;
+		}
+
+		if (changed)
+		{
+			Log.Information("Updated metadata for user {Username} (user ID {UserID})", arg.After.Username, arg.ID);
+			await user.CommitAsync();
+		}
+
+		// Does the user have any of the auto kick roles?
+		try
+		{
+			var cfg = await _dynamicConfig.GetConfig();
+
+			if (cfg.AutoKickRoles is null)
+				return;
+
+			if (!cfg.AutoKickRoles.ContainsAny(arg.After.RoleIds.Select(n => new Snowflake(n)).ToArray()))
+				return;
+
+			await arg.After.KickAsync("Automatically kicked for having a forbidden role.");
+			await _metricService.Emit(Metric.AMS_ForbiddenRoleKicks, 1);
+		}
+		catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to determine if user {UserID} has any forbidden roles.", arg.ID.ID);
+		}
+	}
     
-    public async Task RunAsync()
+    public override async Task RunAsync()
     {
         try
         {
             await _metricService.Emit(Metric.AMS_Runs, 1);
             var cfg = await _dynamicConfig.GetConfig();
             
-            // Caution:  This is an extremely long running method!
+            // Caution: This is an extremely long-running method!
             Log.Information("Beginning auto member routine");
 
             if (cfg.AutoMemberConfig.EnableGaiusCheck)
@@ -172,7 +264,7 @@ public sealed class AutoMemberSystem
                 await UpdateGaiusPunishments();
             }
 
-            _earliestJoinTime = DateTime.UtcNow - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumJoinAge);
+            _earliestJoinTime = _timeProvider.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumJoinAge);
             _recentMessages = GetMessagesSent();
             
             Log.Verbose("Earliest join time: {EarliestJoinTime}", _earliestJoinTime);
@@ -188,26 +280,44 @@ public sealed class AutoMemberSystem
 
             var membershipGrants = 0;
 
-            newMembers = await newMembers.ToAsyncEnumerable()
-                .WhereAwait(async user => await CheckEligibility(user) == MembershipEligibility.Eligible).ToListAsync();
+			var eligibleMembers = newMembers.Where(user => CheckEligibility(cfg, user) == MembershipEligibility.Eligible)
+				.ToDictionary(n => new Snowflake(n.Id), n => n);
             
-            Log.Verbose("There are {NumNewMembers} users eligible for membership", newMembers.Count);
-                
-            foreach (var user in newMembers)
-            {
-                // User has all of the qualifications, let's update their role
-                try
-                {
-                    await GrantMembership(cfg, user);
-                    membershipGrants++;
-                    
-                    Log.Information("Granted {UserId} membership", user.Id);
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Failed to grant user {UserId} membership", user.Id);
-                }
-            }
+            Log.Verbose("There are {NumNewMembers} users eligible for membership", eligibleMembers.Count);
+
+            // Batch get users to save bandwidth
+            var userData = (
+				await _ddbService.GetBatchUsersAsync(
+					eligibleMembers.Select(n => n.Key))
+				)
+                .Select(x => (x.Data.UserID!, x))
+                .ToDictionary();
+
+			// Determine which users are not present in DDB and need to be created
+			var usersToCreate = eligibleMembers.Where(n => !userData.ContainsKey(n.Key)).Select(n => n.Value);
+
+			// Step 1: Create missing users in DDB
+			await foreach (var (id, user) in CreateMissingUsers(usersToCreate))
+				userData.Add(id, user);
+
+			// Step 2: Grant membership to eligible users
+			foreach (var (id, dbUser) in userData)
+			{
+				try
+				{
+					// User has all the qualifications, let's update their role
+					if (!eligibleMembers.TryGetValue(id, out var user))
+						throw new BadStateException("Unexpected state: expected ID is missing from eligibleMembers");
+
+					await GrantMembership(cfg, user, dbUser);
+					membershipGrants++;
+
+					Log.Information("Granted {UserId} membership", user.Id);
+				} catch (Exception ex)
+				{
+					Log.Warning(ex, "Failed to grant user {UserId} membership", id);
+				}
+			}
             
             await _metricService.Emit(Metric.AMS_UsersGrantedMembership, membershipGrants);
         }
@@ -217,29 +327,45 @@ public sealed class AutoMemberSystem
         }
     }
 
-    private async Task<bool> WasUserGrantedMembershipBefore(Snowflake snowflake)
-    {
-        if (_ddbCache.Contains(snowflake.ID.ToString()) && (bool)_ddbCache[snowflake.ID.ToString()])
-            return true;
+	private async IAsyncEnumerable<KeyValuePair<Snowflake, InstarDatabaseEntry<InstarUserData>>> CreateMissingUsers(IEnumerable<IGuildUser> users)
+	{
+		foreach (var user in users)
+		{
+			InstarDatabaseEntry<InstarUserData>? dbUser;
+			try
+			{
+				await _ddbService.CreateUserAsync(InstarUserData.CreateFrom(user));
 
-        var grantedMembership = await _ddbService.GetUserMembership(snowflake.ID);
-        if (grantedMembership is null)
-            return false;
-        
-        // Cache for 6 hour sliding window.  If accessed, time is reset.
-        _ddbCache.Add(snowflake.ID.ToString(), grantedMembership.Value, new CacheItemPolicy
-        {
-            SlidingExpiration = TimeSpan.FromHours(6)
-        });
+				// Now, get the user we just created
+				dbUser = await _ddbService.GetUserAsync(user.Id);
 
-        return grantedMembership.Value;
-    }
+				if (dbUser is null)
+				{
+					// Welp, something's wrong with DynamoDB that isn't throwing an
+					// exception with CreateUserAsync or GetUserAsync. At this point,
+					// we expect the user to be present in DynamoDB, so we'll treat
+					// this as an error.
+					throw new BadStateException("Expected user to be created and returned from DynamoDB");
+				}
+			} catch (Exception ex)
+			{
+				await _metricService.Emit(Metric.AMS_DynamoFailures, 1);
+				Log.Error(ex, "Failed to get or create user with ID {UserID} in DynamoDB", user.Id);
+				continue;
+			}
 
-    private async Task GrantMembership(InstarDynamicConfiguration cfg, IGuildUser user)
+			yield return new KeyValuePair<Snowflake, InstarDatabaseEntry<InstarUserData>>(user.Id, dbUser);
+		}
+	}
+
+	private async Task GrantMembership(InstarDynamicConfiguration cfg, IGuildUser user,
+        InstarDatabaseEntry<InstarUserData> dbUser)
     {
         await user.AddRoleAsync(cfg.MemberRoleID);
         await user.RemoveRoleAsync(cfg.NewMemberRoleID);
-        await _ddbService.UpdateUserMembership(user.Id, true);
+        
+        dbUser.Data.Position = InstarUserPosition.Member;
+        await dbUser.CommitAsync();
 
         // Remove the cache entry
         if (_ddbCache.Contains(user.Id.ToString()))
@@ -249,10 +375,25 @@ public sealed class AutoMemberSystem
         _introductionPosters.TryRemove(user.Id, out _);
     }
 
-    public async Task<MembershipEligibility> CheckEligibility(IGuildUser user)
+	/// <summary>
+	/// Determines the eligibility of a user for membership based on specific criteria.
+	/// </summary>
+	/// <param name="cfg">The current configuration from AppConfig.</param>
+	/// <param name="user">The user whose eligibility is being evaluated.</param>
+	/// <returns>An enumeration value of type <see cref="MembershipEligibility"/> that indicates the user's membership eligibility status.</returns>
+	/// <remarks>
+	///     The criteria for membership is as follows:
+	/// <list type="bullet">
+	///     <item>The user must have the required roles (see <see cref="CheckUserRequiredRoles"/>)</item>
+	///     <item>The user must be on the server for a configurable minimum amount of time</item>
+	///     <item>The user must have posted an introduction</item>
+	///     <item>The user must have posted enough messages in a configurable amount of time</item>
+	///     <item>The user must not have been issued a moderator action</item>
+	///     <item>The user must not already be a member</item>
+	/// </list>
+	/// </remarks>
+	public MembershipEligibility CheckEligibility(InstarDynamicConfiguration cfg, IGuildUser user)
     {
-        var cfg = await _dynamicConfig.GetConfig();
-        
         // We need recent messages here, so load it into
         // context if it does not exist, such as when the
         // bot first starts and has not run AMS yet.
@@ -264,7 +405,7 @@ public sealed class AutoMemberSystem
             eligibility |= MembershipEligibility.AlreadyMember;
 
         if (user.JoinedAt > _earliestJoinTime)
-            eligibility |= MembershipEligibility.TooYoung;
+            eligibility |= MembershipEligibility.InadequateTenure;
 
         if (!CheckUserRequiredRoles(cfg, user))
             eligibility |= MembershipEligibility.MissingRoles;
@@ -272,19 +413,30 @@ public sealed class AutoMemberSystem
         if (!_introductionPosters.ContainsKey(user.Id))
             eligibility |=  MembershipEligibility.MissingIntroduction;
 
-        if (!_recentMessages.ContainsKey(user.Id) || _recentMessages[user.Id] < cfg.AutoMemberConfig.MinimumMessages)
+        if (_recentMessages.TryGetValue(user.Id, out var messages) && messages < cfg.AutoMemberConfig.MinimumMessages)
             eligibility |=  MembershipEligibility.NotEnoughMessages;
 
         if (_punishedUsers.ContainsKey(user.Id))
             eligibility |= MembershipEligibility.PunishmentReceived;
 
-        if (eligibility != MembershipEligibility.Eligible)
-            eligibility |= MembershipEligibility.NotEligible;
+		if (user.RoleIds.Contains(cfg.AutoMemberConfig.HoldRole))
+			eligibility |= MembershipEligibility.AutoMemberHold;
+
+		// If the eligibility is no longer exactly Eligible,
+		// then we can unset that flag.
+		if (eligibility != MembershipEligibility.Eligible)
+			eligibility &= ~MembershipEligibility.Eligible;
         
-        Log.Verbose("User {User} ({UserID}) membership eligibility: {Eligibility}", user.Username, user.Id, eligibility);
+		Log.Verbose("User {User} ({UserID}) membership eligibility: {Eligibility}", user.Username, user.Id, eligibility);
         return eligibility;
     }
 
+    /// <summary>
+    /// Verifies if a user possesses the required roles for automatic membership based on the provided configuration.
+    /// </summary>
+    /// <param name="cfg">The dynamic configuration containing role requirements and settings for automatic membership.</param>
+    /// <param name="user">The user whose roles are being checked against the configuration.</param>
+    /// <returns>True if the user satisfies the role requirements; otherwise, false.</returns>
     private static bool CheckUserRequiredRoles(InstarDynamicConfiguration cfg, IGuildUser user)
     {
         // Auto Member Hold overrides all role permissions
@@ -299,32 +451,40 @@ public sealed class AutoMemberSystem
 
     private Dictionary<ulong, int> GetMessagesSent()
     {
-        var map = new Dictionary<ulong, int>();
-
-        foreach (var cacheEntry in _messageCache)
-        {
-            if (!map.ContainsKey(cacheEntry.Value.UserID))
-                map.Add(cacheEntry.Value.UserID, 1);
-            else
-                map[cacheEntry.Value.UserID]++;
-        }
+        var map = _messageCache
+            .Cast<KeyValuePair<string, MessageProperties>>() // Cast to access LINQ extensions
+            .Select(entry => entry.Value)
+            .GroupBy(properties => properties.UserID)
+            .ToDictionary(group => group.Key, group => group.Count());
 
         return map;
     }
     
     private async Task PreloadGaiusPunishments()
     {
-        foreach (var warning in await _gaiusApiService.GetAllWarnings())
-            _punishedUsers.TryAdd(warning.UserID.ID, true);
-        foreach (var caselog in await _gaiusApiService.GetAllCaselogs())
-            _punishedUsers.TryAdd(caselog.UserID.ID, true);
+		try
+		{
+			var (warnings, caselogs) = FilterPunishments(
+				await _gaiusApiService.GetAllWarnings(),
+				await _gaiusApiService.GetAllCaselogs());
+
+			foreach (var warning in warnings)
+				_punishedUsers.TryAdd(warning.UserID.ID, true);
+			foreach (var caselog in caselogs)
+				_punishedUsers.TryAdd(caselog.UserID.ID, true);
+		}
+		catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to preload Gaius punishments.");
+			throw;
+		}
     }
 
     private async Task PreloadMessageCache(InstarDynamicConfiguration cfg)
     {
         Log.Information("Preloading message cache...");
         var guild = _discord.GetGuild();
-        var earliestMessageTime = DateTime.UtcNow - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumMessageTime);
+        var earliestMessageTime = _timeProvider.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(cfg.AutoMemberConfig.MinimumMessageTime);
         var messages = _discord.GetMessages(guild, earliestMessageTime);
 
         await foreach (var message in messages)
@@ -342,24 +502,36 @@ public sealed class AutoMemberSystem
     {
         if (await _discord.GetChannel(cfg.AutoMemberConfig.IntroductionChannel) is not ITextChannel introChannel)
             throw new InvalidOperationException("Introductions channel not found");
-        
-        var messages = (await introChannel.GetMessagesAsync().FlattenAsync()).ToList();
+
+        var messages = (await introChannel.GetMessagesAsync().FlattenAsync()).GetEnumerator();
 
         // Assumption:  Last message is the oldest one
-        while (messages.Count > 0)
+        while (messages.MoveNext()) // Move to the first message, if there is any
         {
-            var oldestMessage = messages[0];
-            foreach (var message in messages)
+            IMessage? message;
+            IMessage? oldestMessage = null;
+
+            do
             {
+                message = messages.Current;
+                if (message is null)
+                    break;
+
                 if (message.Author is IGuildUser sgUser && sgUser.RoleIds.Contains(cfg.MemberRoleID.ID))
                     continue;
-                
-                _introductionPosters.TryAdd(message.Author.Id, true);
-                if (message.Timestamp < oldestMessage.Timestamp)
-                    oldestMessage = message;
-            }
 
-            messages = (await introChannel.GetMessagesAsync(oldestMessage, Direction.Before).FlattenAsync()).ToList();
+                _introductionPosters.TryAdd(message.Author.Id, true);
+
+                if (oldestMessage is null || message.Timestamp < oldestMessage.Timestamp)
+                    oldestMessage = message;
+            } while (messages.MoveNext());
+
+            if (message is null || oldestMessage is null)
+                break;
+
+            messages = (await introChannel.GetMessagesAsync(oldestMessage, Direction.Before).FlattenAsync()).GetEnumerator();
         }
+
+        messages.Dispose();
     }
 }

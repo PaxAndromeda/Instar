@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
-using Amazon.AppConfigData;
 using Amazon;
+using Amazon.AppConfigData;
 using Amazon.AppConfigData.Model;
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
@@ -22,7 +22,8 @@ public interface IDynamicConfigService
 
 public sealed class AWSDynamicConfigService : IDynamicConfigService
 {
-    private readonly AmazonAppConfigDataClient _appConfigDataClient;
+	private readonly TimeProvider _timeProvider;
+	private readonly AmazonAppConfigDataClient _appConfigDataClient;
     private readonly AmazonSimpleSystemsManagementClient _ssmClient;
     private string _configData = null!;
     private string _nextToken = null!;
@@ -34,9 +35,10 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
     private readonly string _environment;
     private readonly string _configProfile;
 
-    public AWSDynamicConfigService(IConfiguration config)
+    public AWSDynamicConfigService(IConfiguration config, TimeProvider timeProvider)
     {
-        Guard.Against.Null(config);
+	    _timeProvider = timeProvider;
+	    Guard.Against.Null(config);
 
         var awsSection = config.GetSection("AWS");
         var appConfigSection = awsSection.GetSection("AppConfig");
@@ -64,8 +66,8 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
         try
         {
             await _pollSemaphore.WaitAsync();
-            if (DateTime.UtcNow > _nextPollTime)
-                await Poll(false);
+            if (_timeProvider.GetUtcNow().UtcDateTime > _nextPollTime)
+                await Poll();
 
             return _current;
         }
@@ -98,10 +100,12 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
         });
 
         _nextToken = configSession.InitialConfigurationToken;
-        await Poll(true);
+        await Poll();
     }
 
-    private async Task Poll(bool bypass)
+	private const string ServiceName = "Dynamic Config";
+
+    private async Task Poll()
     {
         try
         {
@@ -111,24 +115,24 @@ public sealed class AWSDynamicConfigService : IDynamicConfigService
             });
 
             _nextToken = result.NextPollConfigurationToken;
-            _nextPollTime = DateTime.UtcNow + TimeSpan.FromSeconds(result.NextPollIntervalInSeconds);
-            
-            // Per the documentation, if VersionLabel is empty, then the client
-            // has the most up-to-date configuration already stored.  We can stop
-            // here.
-            if (!bypass && string.IsNullOrEmpty(result.VersionLabel))
-                return;
+            _nextPollTime = _timeProvider.GetUtcNow().UtcDateTime + TimeSpan.FromSeconds((double)(result.NextPollIntervalInSeconds ?? 60));
 
-            if (!string.IsNullOrEmpty(result.VersionLabel))
-                Log.Information("Downloading latest configuration version {ConfigVersion} from AppConfig...", result.VersionLabel);
-            else
-                Log.Information("Downloading latest configuration from AppConfig...");
+			Log.Debug("[{ServiceName}] Next polling time: {NextPollTime}", ServiceName, _nextPollTime);
+
+			// Per the documentation, if configuration is empty, then the client
+			// has the most up-to-date configuration already stored.  We can stop
+			// here.
+			if (result.Configuration is null)
+			{
+				Log.Verbose("[{ServiceName}] No new configuration is available.", ServiceName);
+				return;
+			}
 
             _configData = Encoding.UTF8.GetString(result.Configuration.ToArray());
             _current = JsonConvert.DeserializeObject<InstarDynamicConfiguration>(_configData) ??
                        throw new ConfigurationException("Failed to parse configuration");
             
-            Log.Information("Done downloading latest configuration!");
+			Log.Information("[{ServiceName}] New configuration downloaded from AppConfig!", ServiceName);
         }
         catch (Exception ex)
         {

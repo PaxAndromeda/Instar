@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Amazon;
+﻿using Amazon;
 using Amazon.CloudWatchLogs;
 using CommandLine;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +9,7 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Json;
 using Serilog.Sinks.AwsCloudWatch;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PaxAndromeda.Instar;
 
@@ -19,11 +19,11 @@ internal static class Program
     private static CancellationTokenSource _cts = null!;
     private static IServiceProvider _services = null!;
 
+    // ReSharper disable once UnusedParameter.Global
     public static async Task Main(string[] args)
     {
         AppDomain.CurrentDomain.UnhandledException += CurrentDomainOnUnhandledException;
 
-        var cli = Parser.Default.ParseArguments<CommandLineOptions>(args).Value;
 
 #if DEBUG
         var configPath = "Config/Instar.debug.conf.json";
@@ -31,15 +31,16 @@ internal static class Program
         var configPath = "Config/Instar.conf.json";
 #endif
 
-        if (!string.IsNullOrEmpty(cli.ConfigPath))
-            configPath = cli.ConfigPath;
-        
-        Log.Information("Config path is {Path}", configPath);
+		var cli = Parser.Default.ParseArguments<CommandLineOptions>(args).Value;
+		if (!string.IsNullOrEmpty(cli.ConfigPath))
+			configPath = cli.ConfigPath;
+
+		Log.Information("Config path is {Path}", configPath);
         IConfiguration config = new ConfigurationBuilder()
             .AddJsonFile(configPath)
             .Build();
         
-        InitializeLogger(config);
+        InitializeLogger(config, cli.LogLevel);
         
         Console.CancelKeyPress += StopSystem;
         await RunAsync(config);
@@ -49,8 +50,15 @@ internal static class Program
 
     private static async void StopSystem(object? sender, ConsoleCancelEventArgs e)
     {
-        await _services.GetRequiredService<DiscordService>().Stop();
-        _cts.Cancel();
+        try
+		{
+			await _services.GetRequiredService<IDiscordService>().Stop();
+			await _cts.CancelAsync();
+		}
+        catch (Exception err)
+        {
+            Log.Fatal(err, "FATAL: Unhandled exception caught during shutdown");
+        }
     }
 
     private static async Task RunAsync(IConfiguration config)
@@ -62,26 +70,29 @@ internal static class Program
         var dynamicConfig = _services.GetRequiredService<IDynamicConfigService>();
         await dynamicConfig.Initialize();
 
-        var discordService = _services.GetRequiredService<IDiscordService>();
+		var discordService = _services.GetRequiredService<IDiscordService>();
         await discordService.Start(_services);
-    }
 
-    private static void InitializeLogger(IConfiguration config)
+		// Start up other systems
+		List<Task> tasks = [
+			_services.GetRequiredService<IBirthdaySystem>().Start(),
+			_services.GetRequiredService<IAutoMemberSystem>().Start(),
+			_services.GetRequiredService<INotificationService>().Start(),
+			_services.GetRequiredService<NTPService>().Start()
+		];
+
+		Task.WaitAll(tasks);
+	}
+
+    private static void InitializeLogger(IConfiguration config, LogEventLevel? requestedLogLevel)
     {
-#if TRACE
-        const LogEventLevel minLevel = LogEventLevel.Verbose;
-#elif DEBUG
-        const LogEventLevel minLevel = LogEventLevel.Verbose;
-#else
-        const LogEventLevel minLevel = LogEventLevel.Information;
-#endif
-        
-        var logCfg = new LoggerConfiguration()
-            .Enrich.FromLogContext()
-            .MinimumLevel.Is(minLevel)
+		var logCfg = new LoggerConfiguration()
+			.Enrich.FromLogContext()
+			.MinimumLevel.Is(requestedLogLevel ?? LogEventLevel.Information)
             .WriteTo.Console();
 
-        var awsSection = config.GetSection("AWS");
+
+		var awsSection = config.GetSection("AWS");
         var cwSection = awsSection.GetSection("CloudWatch");
         if (cwSection.GetValue<bool>("Enabled"))
         {
@@ -105,7 +116,7 @@ internal static class Program
         Log.Fatal(e.ExceptionObject as Exception, "FATAL: Unhandled exception caught");
     }
 
-    private static IServiceProvider ConfigureServices(IConfiguration config)
+    private static ServiceProvider ConfigureServices(IConfiguration config)
     {
         var services = new ServiceCollection();
 
@@ -114,18 +125,28 @@ internal static class Program
         
         // Services
         services.AddSingleton<TeamService>();
-        services.AddTransient<IInstarDDBService, InstarDDBService>();
-        services.AddTransient<IMetricService, CloudwatchMetricService>();
+        services.AddTransient<IDatabaseService, InstarDynamoDBService>();
         services.AddTransient<IGaiusAPIService, GaiusAPIService>();
         services.AddSingleton<IDiscordService, DiscordService>();
-        services.AddSingleton<AutoMemberSystem>();
-        services.AddSingleton<IDynamicConfigService, AWSDynamicConfigService>();
-        
-        // Commands & Interactions
-        services.AddTransient<PingCommand>();
+		services.AddSingleton<IAutoMemberSystem, AutoMemberSystem>();
+		services.AddSingleton<IBirthdaySystem, BirthdaySystem>();
+		services.AddSingleton<IDynamicConfigService, AWSDynamicConfigService>();
+		services.AddSingleton<INotificationService, NotificationService>();
+		services.AddSingleton(TimeProvider.System);
+		services.AddSingleton<NTPService>();
+
+#if DEBUG
+		services.AddSingleton<IMetricService, FileSystemMetricService>();
+#else
+        services.AddTransient<IMetricService, CloudwatchMetricService>();
+#endif
+
+		// Commands & Interactions
+		services.AddTransient<PingCommand>();
         services.AddTransient<SetBirthdayCommand>();
         services.AddSingleton<PageCommand>();
         services.AddTransient<IContextCommand, ReportUserCommand>();
+		services.AddTransient<AutoMemberHoldCommand>();
 
         return services.BuildServiceProvider();
     }

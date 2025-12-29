@@ -4,6 +4,7 @@ using Discord;
 using Discord.Interactions;
 using JetBrains.Annotations;
 using PaxAndromeda.Instar.ConfigModels;
+using PaxAndromeda.Instar.Embeds;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Preconditions;
 using PaxAndromeda.Instar.Services;
@@ -14,17 +15,8 @@ namespace PaxAndromeda.Instar.Commands;
 // Required to be unsealed for mocking
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
 [SuppressMessage("ReSharper", "ClassWithVirtualMembersNeverInherited.Global")] // Required for mocking
-public class PageCommand : BaseCommand
+public class PageCommand(TeamService teamService, IMetricService metricService) : BaseCommand
 {
-    private readonly TeamService _teamService;
-    private readonly IMetricService _metricService;
-
-    public PageCommand(TeamService teamService, IMetricService metricService)
-    {
-        _teamService = teamService;
-        _metricService = metricService;
-    }
-
     [UsedImplicitly]
     [SlashCommand("page", "This command initiates a directed page.")]
     [RequireStaffMember]
@@ -51,7 +43,7 @@ public class PageCommand : BaseCommand
         {
             Log.Verbose("User {User} is attempting to page {Team}: {Reason}", Context.User.Id, team, reason);
 
-            var userTeam = await _teamService.GetUserPrimaryStaffTeam(Context.User);
+            var userTeam = await teamService.GetUserPrimaryStaffTeam(Context.User);
             if (!CheckPermissions(Context.User, userTeam, team, teamLead, out var response))
             {
                 await RespondAsync(response, ephemeral: true);
@@ -60,24 +52,24 @@ public class PageCommand : BaseCommand
 
             string mention;
             if (team == PageTarget.Test)
-                mention = "This is a __**TEST**__ page.";
+                mention = Strings.Command_Page_TestPageMessage;
             else if (teamLead)
-                mention = await _teamService.GetTeamLeadMention(team);
+                mention = await teamService.GetTeamLeadMention(team);
             else
-                mention = await _teamService.GetTeamMention(team);
+                mention = await teamService.GetTeamMention(team);
 
             Log.Debug("Emitting page to {ChannelName}", Context.Channel?.Name);
             await RespondAsync(
                 mention,
-                embed: BuildEmbed(reason, message, user, channel, userTeam!, Context.User),
+                embed: new InstarPageEmbed(reason, message, user, channel, userTeam!, Context.User).Build(),
                 allowedMentions: AllowedMentions.All);
 
-            await _metricService.Emit(Metric.Paging_SentPages, 1);
+            await metricService.Emit(Metric.Paging_SentPages, 1);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to send page from {User}", Context.User.Id);
-            await RespondAsync("Failed to process command due to an internal server error.", ephemeral: true);
+            await RespondAsync(Strings.Command_Page_Error_Unexpected, ephemeral: true);
         }
     }
 
@@ -97,7 +89,7 @@ public class PageCommand : BaseCommand
 
         if (team is null)
         {
-            response = "You are not authorized to use this command.";
+            response = Strings.Command_Page_Error_NotAuthorized;
             Log.Information("{User} was not authorized to send a page", user.Id);
             return false;
         }
@@ -106,9 +98,9 @@ public class PageCommand : BaseCommand
             return true;
 
         // Check permissions.  Only mod+ can send an "all" page
-        if (team.Priority > 3 && pageTarget == PageTarget.All) // i.e. Helper
+        if (team.Priority > 3 && pageTarget == PageTarget.All) // i.e. Helper, Community Manager
         {
-            response = "You are not authorized to send a page to the entire staff team.";
+            response = Strings.Command_Page_Error_FullTeamNotAuthorized;
             Log.Information("{User} was not authorized to send a page to the entire staff team", user.Id);
             return false;
         }
@@ -116,53 +108,8 @@ public class PageCommand : BaseCommand
         if (pageTarget != PageTarget.All || !teamLead)
             return true;
 
-        response =
-            "Failed to send page.  The 'All' team does not have a teamleader.  If intended to page the owner, please select the Owner as the team.";
-        return false;
-    }
+		response = Strings.Command_Page_Error_NoAllTeamlead;
 
-    /// <summary>
-    ///     Builds the page embed.
-    /// </summary>
-    /// <param name="reason">The reason for the page.</param>
-    /// <param name="message">A message link.  May be null.</param>
-    /// <param name="targetUser">The user being paged about.  May be null.</param>
-    /// <param name="channel">The channel being paged about.  May be null.</param>
-    /// <param name="userTeam">The paging user's team</param>
-    /// <param name="pagingUser">The paging user</param>
-    /// <returns>A standard embed embodying all parameters provided</returns>
-    private static Embed BuildEmbed(
-        string reason,
-        string message,
-        IUser? targetUser,
-        IChannel? channel,
-        Team userTeam,
-        IGuildUser pagingUser)
-    {
-        var fields = new List<EmbedFieldBuilder>();
-
-        if (targetUser is not null)
-            fields.Add(new EmbedFieldBuilder().WithIsInline(true).WithName("User").WithValue($"<@{targetUser.Id}>"));
-
-        if (channel is not null)
-            fields.Add(new EmbedFieldBuilder().WithIsInline(true).WithName("Channel").WithValue($"<#{channel.Id}>"));
-
-        if (!string.IsNullOrEmpty(message))
-            fields.Add(new EmbedFieldBuilder().WithIsInline(true).WithName("Message").WithValue(message));
-
-        var builder = new EmbedBuilder()
-            // Set up all the basic stuff first
-            .WithCurrentTimestamp()
-            .WithColor(userTeam.Color)
-            .WithAuthor(pagingUser.Nickname ?? pagingUser.Username, pagingUser.GetAvatarUrl())
-            .WithFooter(new EmbedFooterBuilder()
-                .WithText("Instar Paging System")
-                .WithIconUrl("https://spacegirl.s3.us-east-1.amazonaws.com/instar.png"))
-            // Description
-            .WithDescription($"```{reason}```")
-            .WithFields(fields);
-
-        var embed = builder.Build();
-        return embed;
+		return false;
     }
 }

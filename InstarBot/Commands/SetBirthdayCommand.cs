@@ -3,6 +3,9 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using JetBrains.Annotations;
+using PaxAndromeda.Instar.ConfigModels;
+using PaxAndromeda.Instar.DynamoModels;
+using PaxAndromeda.Instar.Embeds;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 using Serilog;
@@ -11,119 +14,193 @@ namespace PaxAndromeda.Instar.Commands;
 
 // Required to be unsealed for mocking
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class SetBirthdayCommand : BaseCommand
+public class SetBirthdayCommand(IDatabaseService ddbService, IDynamicConfigService dynamicConfig, IMetricService metricService, IBirthdaySystem birthdaySystem, TimeProvider timeProvider) : BaseCommand
 {
-    private readonly IInstarDDBService _ddbService;
-    private readonly IMetricService _metricService;
+	/// <summary>
+	/// The default year to use when none is provided. We select a year that is sufficiently
+	/// far in the past to be obviously unset, as well as a leap year to accommodate February 29th birthdays.
+	///
+	/// DISCLAIMER: We are not actually asserting that a user that does not provide a year is 425 years old.
+	/// </summary>
+	private const int DefaultYear = 1600;
 
-    public SetBirthdayCommand(IInstarDDBService ddbService, IMetricService metricService)
-    {
-        _ddbService = ddbService;
-        _metricService = metricService;
-    }
+	[UsedImplicitly]
+	[SlashCommand("setbirthday", "Sets your birthday on the server.")]
+	public async Task SetBirthday(
+		[MinValue(1)] [MaxValue(12)] [Summary(description: "The month you were born.")]
+		Month month,
+		[MinValue(1)] [MaxValue(31)] [Summary(description: "The day you were born.")]
+		int day,
+		[MinValue(1900)] [MaxValue(2099)] [Summary(description: "The year you were born. We use this to automatically update age roles.")]
+		int? year = null,
+		[MinValue(-12)]
+		[MaxValue(+12)]
+		[Summary("timezone", "Set your time zone so your birthday role is applied at the correct time of day.")]
+		[Autocomplete]
+		int tzOffset = 0)
+	{
+		if (Context.User is null)
+		{
+			Log.Warning("Context.User was null");
+			await RespondAsync(
+				Strings.Command_SetBirthday_Error_Unknown,
+				ephemeral: true);
+			return;
+		}
 
-    [UsedImplicitly]
-    [RequireOwner]
-    [DefaultMemberPermissions(GuildPermission.Administrator)]
-    [SlashCommand("setbirthday", "Sets your birthday on the server.")]
-    public async Task SetBirthday(
-        [MinValue(1)] [MaxValue(12)] [Summary(description: "The month you were born.")]
-        Month month,
-        [MinValue(1)] [MaxValue(31)] [Summary(description: "The day you were born.")]
-        int day,
-        [MinValue(1900)] [MaxValue(2099)] [Summary(description: "The year you were born.")]
-        int year,
-        [MinValue(-12)]
-        [MaxValue(+12)]
-        [Summary("timezone", "Select your nearest time zone offset in hours from GMT.")]
-        [Autocomplete]
-        int tzOffset = 0)
-    {
-        var daysInMonth = DateTime.DaysInMonth(year, (int)month);
+		if ((int) month is < 0 or > 12)
+		{
+			await RespondAsync(
+				Strings.Command_SetBirthday_MonthsOutOfRange,
+				ephemeral: true);
+			return;
+		}
 
-        // First step:  Does the provided number of days exceed the number of days in the given month?
-        if (day > daysInMonth)
+		// We have to assume a leap year if the user did not provide a year.
+		int actualYear = year ?? DefaultYear;
+
+		var daysInMonth = DateTime.DaysInMonth(actualYear, (int)month);
+
+		// First step:  Does the provided number of days exceed the number of days in the given month?
+		if (day > daysInMonth)
+		{
+			await RespondAsync(
+				string.Format(Strings.Command_SetBirthday_DaysInMonthOutOfRange, daysInMonth, month, year),
+				ephemeral: true);
+			return;
+		}
+
+		var unspecifiedDate = new DateTime(actualYear, (int)month, day, 0, 0, 0, DateTimeKind.Unspecified);
+		var dtZ = new DateTimeOffset(unspecifiedDate, TimeSpan.FromHours(tzOffset));
+		
+		// Second step:  Is the provided birthday actually in the future?
+		if (dtZ.UtcDateTime > timeProvider.GetUtcNow())
+		{
+			await RespondAsync(
+				Strings.Command_SetBirthday_NotTimeTraveler,
+				ephemeral: true);
+			return;
+		}
+		
+		var birthday = new Birthday(dtZ, timeProvider);
+
+		
+
+		// Third step:  Is the user below the age of 13?
+		var cfg = await dynamicConfig.GetConfig();
+		bool isUnderage = birthday.Age < cfg.BirthdayConfig.MinimumPermissibleAge;
+
+        try
         {
-            await RespondAsync(
-                $"There are only {daysInMonth} days in {month} {year}.  Your birthday was not set.",
-                ephemeral: true);
-            return;
-        }
+            var dbUser = await ddbService.GetOrCreateUserAsync(Context.User);
+			if (dbUser.Data.Birthday is not null)
+			{
+				var originalBirthdayTimestamp = dbUser.Data.Birthday.Timestamp;
+				await RespondAsync(string.Format(Strings.Command_SetBirthday_Error_AlreadySet, originalBirthdayTimestamp), ephemeral: true);
+				return;
+			}
 
-        var dtLocal = new DateTime(year, (int)month, day, 0, 0, 0, DateTimeKind.Unspecified);
-        var dtUtc = new DateTime(year, (int)month, day, 0, 0, 0, DateTimeKind.Utc).AddHours(-tzOffset);
+			if (isUnderage)
+			{
+				Log.Warning("User {UserID} recorded a birthday that puts their age below 13!  {UtcTime}", Context.User!.Id,
+					birthday.Birthdate.UtcDateTime);
 
-        // Second step:  Is the provided birthday actually in the future?
-        if (dtUtc > DateTime.UtcNow)
-        {
-            await RespondAsync(
-                "You are not a time traveler.  Your birthday was not set.",
-                ephemeral: true);
-            return;
-        }
+				await HandleUnderage(cfg, Context.User, birthday);
+			}
 
-        // Third step:  Is the user below the age of 13?
-        // Note:  We will assume all years are 365.25 days to account for leap year madness.
-        if (DateTime.UtcNow - dtUtc < TimeSpan.FromDays(365.25 * 13))
-            Log.Warning("User {UserID} recorded a birthday that puts their age below 13!  {UtcTime}", Context.User!.Id,
-                dtUtc);
-        // TODO:  Notify staff?
+			dbUser.Data.Birthday = birthday;
+			dbUser.Data.Birthdate = birthday.Key;
 
-        var ok = await _ddbService.UpdateUserBirthday(new Snowflake(Context.User!.Id), dtUtc);
+			// If the user is underage and is a new member and does not already have an auto member hold record,
+			// we automatically withhold their membership for staff review.
+			if (isUnderage && dbUser.Data is { Position: InstarUserPosition.NewMember, AutoMemberHoldRecord: null })
+			{
+				dbUser.Data.AutoMemberHoldRecord = new AutoMemberHoldRecord
+				{
+					Date = timeProvider.GetUtcNow().UtcDateTime,
+					ModeratorID = cfg.BotUserID,
+					Reason = string.Format(Strings.Command_SetBirthday_Underage_AMHReason, birthday.Timestamp, cfg.BirthdayConfig.MinimumPermissibleAge)
+				};
+			}
 
-        if (ok)
-        {
+			await dbUser.CommitAsync();
+			
             Log.Information("User {UserID} birthday set to {DateTime} (UTC time calculated as {UtcTime})",
                 Context.User!.Id,
-                dtLocal, dtUtc);
+                birthday.Birthdate, birthday.Birthdate.UtcDateTime);
 
-            await RespondAsync($"Your birthday was set to {dtLocal:D}.", ephemeral: true);
-            await _metricService.Emit(Metric.BS_BirthdaysSet, 1);
+			// Fourth step: Grant birthday role if the user's birthday is today THEIR time.
+			if (birthday.IsToday)
+			{
+				// User's birthday is today in their timezone; grant birthday role.
+				await birthdaySystem.GrantUnexpectedBirthday(Context.User, birthday);
+			}
+
+			var extrapolatedBirthday = birthday.Observed;
+			var dateStr = unspecifiedDate.ToString("MMMM dnn", true);
+
+			await RespondAsync(string.Format(Strings.Command_SetBirthday_Success, dateStr, extrapolatedBirthday.ToUnixTimeSeconds()), ephemeral: true);
+            await metricService.Emit(Metric.BS_BirthdaysSet, 1);
         }
-        else
+        catch (Exception ex)
         {
-            Log.Warning("Failed to update {UserID}'s birthday due to a DynamoDB failure",
+            Log.Error(ex, "Failed to update {UserID}'s birthday due to a DynamoDB failure",
                 Context.User!.Id);
 
-            await RespondAsync("Your birthday could not be set at this time.  Please try again later.",
+            await RespondAsync(Strings.Command_SetBirthday_Error_CouldNotSetBirthday,
                 ephemeral: true);
         }
     }
 
-    [UsedImplicitly]
+	private async Task HandleUnderage(InstarDynamicConfiguration cfg, IGuildUser user, Birthday birthday)
+	{
+		var staffAnnounceChannel = Context.Guild.GetTextChannel(cfg.StaffAnnounceChannel);
+
+		if (staffAnnounceChannel is null)
+		{
+			Log.Error("Could not find staff announce channel by ID {ChannelID}", cfg.StaffAnnounceChannel.ID);
+			return;
+		}
+
+		var warningEmbed = new InstarUnderageUserWarningEmbed(cfg, user, user.RoleIds.Contains(cfg.MemberRoleID), birthday).Build();
+
+		await staffAnnounceChannel.SendMessageAsync($"<@&{cfg.StaffRoleID}>", embed: warningEmbed);
+	}
+
+	[UsedImplicitly]
     [ExcludeFromCodeCoverage(Justification = "No logic.  Just returns list")]
     [AutocompleteCommand("timezone", "setbirthday")]
     public async Task HandleTimezoneAutocomplete()
     {
         Log.Debug("AUTOCOMPLETE");
-        IEnumerable<AutocompleteResult> results = new[]
-        {
-            new AutocompleteResult("GMT-12 International Date Line West", -12),
-            new AutocompleteResult("GMT-11 Midway Island, Samoa", -11),
-            new AutocompleteResult("GMT-10 Hawaii", -10),
-            new AutocompleteResult("GMT-9 Alaska", -9),
-            new AutocompleteResult("GMT-8 Pacific Time (US and Canada); Tijuana", -8),
-            new AutocompleteResult("GMT-7 Mountain Time (US and Canada)", -7),
-            new AutocompleteResult("GMT-6 Central Time (US and Canada)", -6),
-            new AutocompleteResult("GMT-5 Eastern Time (US and Canada)", -5),
-            new AutocompleteResult("GMT-4 Atlantic Time (Canada)", -4),
-            new AutocompleteResult("GMT-3 Brasilia, Buenos Aires, Georgetown", -3),
-            new AutocompleteResult("GMT-2 Mid-Atlantic", -2),
-            new AutocompleteResult("GMT-1 Azores, Cape Verde Islands", -1),
-            new AutocompleteResult("GMT+0 Greenwich Mean Time: Dublin, Edinburgh, Lisbon, London", 0),
-            new AutocompleteResult("GMT+1 Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna", 1),
-            new AutocompleteResult("GMT+2 Helsinki, Kiev, Riga, Sofia, Tallinn, Vilnius", 2),
-            new AutocompleteResult("GMT+3 Moscow, St. Petersburg, Volgograd", 3),
-            new AutocompleteResult("GMT+4 Abu Dhabi, Muscat", 4),
-            new AutocompleteResult("GMT+5 Islamabad, Karachi, Tashkent", 5),
-            new AutocompleteResult("GMT+6 Astana, Dhaka", 6),
-            new AutocompleteResult("GMT+7 Bangkok, Hanoi, Jakarta", 7),
-            new AutocompleteResult("GMT+8 Beijing, Chongqing, Hong Kong SAR, Urumqi", 8),
-            new AutocompleteResult("GMT+9 Seoul, Osaka, Sapporo, Tokyo", 9),
-            new AutocompleteResult("GMT+10 Canberra, Melbourne, Sydney", 10),
-            new AutocompleteResult("GMT+11 Magadan, Solomon Islands, New Caledonia", 11),
-            new AutocompleteResult("GMT+12 Auckland, Wellington", 12)
-        };
+        IEnumerable<AutocompleteResult> results =
+        [
+            new("GMT-12 International Date Line West", -12),
+            new("GMT-11 Midway Island, Samoa", -11),
+            new("GMT-10 Hawaii", -10),
+            new("GMT-9 Alaska, R'lyeh", -9),
+            new("GMT-8 Pacific Time (US and Canada); Tijuana", -8),
+            new("GMT-7 Mountain Time (US and Canada)", -7),
+            new("GMT-6 Central Time (US and Canada)", -6),
+            new("GMT-5 Eastern Time (US and Canada)", -5),
+            new("GMT-4 Atlantic Time (Canada)", -4),
+            new("GMT-3 Brasilia, Buenos Aires, Georgetown", -3),
+            new("GMT-2 Mid-Atlantic", -2),
+            new("GMT-1 Azores, Cape Verde Islands", -1),
+            new("GMT+0 Greenwich Mean Time: Dublin, Edinburgh, Lisbon, London", 0),
+            new("GMT+1 Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna", 1),
+            new("GMT+2 Helsinki, Kiev, Riga, Sofia, Tallinn, Vilnius", 2),
+            new("GMT+3 Moscow, St. Petersburg, Volgograd", 3),
+            new("GMT+4 Abu Dhabi, Muscat", 4),
+            new("GMT+5 Islamabad, Karachi, Tashkent", 5),
+            new("GMT+6 Astana, Dhaka", 6),
+            new("GMT+7 Bangkok, Hanoi, Jakarta", 7),
+            new("GMT+8 Beijing, Chongqing, Hong Kong SAR, Urumqi", 8),
+            new("GMT+9 Seoul, Osaka, Sapporo, Tokyo", 9),
+            new("GMT+10 Canberra, Melbourne, Sydney", 10),
+            new("GMT+11 Magadan, Solomon Islands, New Caledonia", 11),
+            new("GMT+12 Auckland, Wellington", 12)
+        ];
 
         await (Context.Interaction as SocketAutocompleteInteraction)?.RespondAsync(results)!;
     }

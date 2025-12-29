@@ -14,10 +14,11 @@ namespace PaxAndromeda.Instar;
 /// </summary>
 /// <remarks>
 ///     Snowflakes are encoded in the following way:
-///
+/// <code>
 ///     Timestamp                                  Wrkr  Prcs  Increment
 ///     111111111111111111111111111111111111111111 11111 11111 111111111111
 ///     64                                         22    17    12          0
+/// </code>
 ///
 ///     Timestamp is the milliseconds since Discord Epoch, the first second of 2015, or 1420070400000
 ///     Worker ID is the internal worker that generated the ID
@@ -27,9 +28,11 @@ namespace PaxAndromeda.Instar;
 /// </remarks>
 [TypeConverter(typeof(SnowflakeConverter))]
 [JsonConverter(typeof(JSnowflakeConverter))]
-public sealed class Snowflake : IEquatable<Snowflake>
+public sealed record Snowflake
 {
     private static int _increment;
+
+	public static readonly DateTime Epoch = new(2015, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     /// <summary>
     /// The Discord epoch, defined as the first second of the year 2015.
@@ -158,7 +161,7 @@ public sealed class Snowflake : IEquatable<Snowflake>
         var newIncrement = Interlocked.Increment(ref _increment);
 
         // Gracefully handle overflows
-        if (newIncrement == int.MinValue)
+        if (newIncrement >= 4096)
         {
             newIncrement = 0;
             Interlocked.Exchange(ref _increment, 0);
@@ -213,6 +216,11 @@ public sealed class Snowflake : IEquatable<Snowflake>
         if (ReferenceEquals(null, other)) return false;
         if (ReferenceEquals(this, other)) return true;
         return ID == other.ID;
+    }
+
+    public override string ToString()
+    {
+		return ID.ToString();
     }
 
     public override int GetHashCode()

@@ -1,3 +1,4 @@
+using JetBrains.Annotations;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Caching;
@@ -15,22 +16,22 @@ public sealed class MemoryCache<T> : MemoryCache, IEnumerable<KeyValuePair<strin
     {
     }
 
-    [SuppressMessage("ReSharper", "UnusedMember.Global")]
-    public bool Add(string key, T value, DateTimeOffset absoluteExpiration, string regionName = null!)
+	[UsedImplicitly]
+	public bool Add(string key, T value, DateTimeOffset absoluteExpiration, string regionName = null!)
     {
         return value != null && base.Add(key, value, absoluteExpiration, regionName);
     }
 
-    [SuppressMessage("ReSharper", "UnusedMethodReturnValue.Global")]
-    public bool Add(string key, T value, CacheItemPolicy policy, string regionName = null!)
+	[UsedImplicitly]
+	public bool Add(string key, T value, CacheItemPolicy policy, string regionName = null!)
     {
         return value != null && base.Add(key, value, policy, regionName);
     }
 
-    [SuppressMessage("ReSharper", "UnusedMember.Global")]
-    public new T Get(string key, string regionName = null!)
+	[UsedImplicitly]
+	public new T Get(string key, string regionName = null!)
     {
-        return (T) base.Get(key, regionName);
+        return (T) base.Get(key, regionName) ?? throw new InvalidOperationException($"{nameof(key)} cannot be null");
     }
 
     public new IEnumerator<KeyValuePair<string, T>> GetEnumerator()

@@ -5,6 +5,7 @@ using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PaxAndromeda.Instar.Commands;
+using PaxAndromeda.Instar.Modals;
 using PaxAndromeda.Instar.Wrappers;
 using Serilog;
 using Serilog.Events;
@@ -22,17 +23,32 @@ public sealed class DiscordService : IDiscordService
     private readonly IServiceProvider _provider;
     private readonly IDynamicConfigService _dynamicConfig;
     private readonly DiscordSocketClient _socketClient;
-    private readonly AsyncEvent<IGuildUser> _userJoinedEvent = new();
-    private readonly AsyncEvent<IMessage> _messageReceivedEvent = new();
+	private readonly AsyncEvent<IGuildUser> _userJoinedEvent = new();
+	private readonly AsyncEvent<IUser> _userLeftEvent = new();
+	private readonly AsyncEvent<UserUpdatedEventArgs> _userUpdatedEvent = new();
+	private readonly AsyncEvent<IMessage> _messageReceivedEvent = new();
     private readonly AsyncEvent<Snowflake> _messageDeletedEvent = new();
+	private readonly AsyncAutoResetEvent _readyEvent = new(false);
 
-    public event Func<IGuildUser, Task> UserJoined
-    {
-        add => _userJoinedEvent.Add(value);
-        remove => _userJoinedEvent.Remove(value);
-    }
+	public event Func<IGuildUser, Task> UserJoined
+	{
+		add => _userJoinedEvent.Add(value);
+		remove => _userJoinedEvent.Remove(value);
+	}
 
-    public event Func<IMessage, Task> MessageReceived
+	public event Func<IUser, Task> UserLeft
+	{
+		add => _userLeftEvent.Add(value);
+		remove => _userLeftEvent.Remove(value);
+	}
+
+	public event Func<UserUpdatedEventArgs, Task> UserUpdated
+	{
+		add => _userUpdatedEvent.Add(value);
+		remove => _userUpdatedEvent.Remove(value);
+	}
+
+	public event Func<IMessage, Task> MessageReceived
     {
         add => _messageReceivedEvent.Add(value);
         remove => _messageReceivedEvent.Remove(value);
@@ -70,6 +86,8 @@ public sealed class DiscordService : IDiscordService
         _socketClient.MessageReceived += async message => await _messageReceivedEvent.Invoke(message);
         _socketClient.MessageDeleted += async (msgCache, _) => await _messageDeletedEvent.Invoke(msgCache.Id);
         _socketClient.UserJoined += async user => await _userJoinedEvent.Invoke(user);
+		_socketClient.UserLeft += async (_, user) => await _userLeftEvent.Invoke(user);
+		_socketClient.GuildMemberUpdated += HandleUserUpdate;
         _interactionService.Log += HandleDiscordLog;
 
         _contextCommands = provider.GetServices<IContextCommand>().ToDictionary(n => n.Name, n => n);
@@ -81,18 +99,28 @@ public sealed class DiscordService : IDiscordService
             throw new ConfigurationException("TargetGuild is not set");
     }
 
+	private async Task HandleUserUpdate(Cacheable<SocketGuildUser, ulong> before, SocketGuildUser after)
+	{
+		// Can't do anything if we don't have a before state.
+		// In the case of a user join, that is handled in UserJoined event.
+		if (!before.HasValue)
+			return;
+
+		await _userUpdatedEvent.Invoke(new UserUpdatedEventArgs(after.Id, before.Value, after));
+	}
+
     private async Task HandleMessageCommand(SocketMessageCommand arg)
     {
         Log.Information("Message command: {CommandName}", arg.CommandName);
 
-        if (!_contextCommands.ContainsKey(arg.CommandName))
+        if (!_contextCommands.TryGetValue(arg.CommandName, out var command))
         {
             Log.Warning("Received message command interaction for unknown command by name {CommandName}",
                 arg.CommandName);
             return;
         }
 
-        await _contextCommands[arg.CommandName].HandleCommand(new MessageCommandInteractionWrapper(arg));
+        await command.HandleCommand(new MessageCommandInteractionWrapper(arg));
     }
 
     private async Task HandleInteraction(SocketInteraction arg)
@@ -144,15 +172,20 @@ public sealed class DiscordService : IDiscordService
                 .Cast<ApplicationCommandProperties>().ToArray();
 
             await _socketClient.BulkOverwriteGlobalApplicationCommandsAsync(props);
-        };
+			_readyEvent.Set();
+
+		};
 
         Log.Verbose("Attempting login...");
         await _socketClient.LoginAsync(TokenType.Bot, _botToken);
         Log.Verbose("Starting Discord...");
         await _socketClient.StartAsync();
-    }
 
-    [SuppressMessage("ReSharper", "TemplateIsNotCompileTimeConstantProblem")]
+		// Wait until ready
+		await _readyEvent.WaitAsync();
+	}
+
+	[SuppressMessage("ReSharper", "TemplateIsNotCompileTimeConstantProblem")]
     private static Task HandleDiscordLog(LogMessage arg)
     {
         var severity = arg.Severity switch
@@ -187,30 +220,60 @@ public sealed class DiscordService : IDiscordService
         try
         {
             var guild = _socketClient.GetGuild(_guild);
-            await _socketClient.DownloadUsersAsync(new[] { guild });
+            await _socketClient.DownloadUsersAsync([guild]);
 
             return guild.Users;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to download users for guild {GuildID}", _guild);
-            return Array.Empty<IGuildUser>();
+            return [];
         }
     }
-    
-    public async IAsyncEnumerable<IMessage> GetMessages(IInstarGuild guild, DateTime afterTime)
+
+	public async Task SyncUsers()
+	{
+		try
+		{
+			var guild = _socketClient.GetGuild(_guild);
+			await _socketClient.DownloadUsersAsync([guild]);
+		} catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to download users for guild {GuildID}", _guild);
+		}
+	}
+
+	public IGuildUser? GetUser(Snowflake snowflake)
+	{
+		try
+		{
+			var guild = _socketClient.GetGuild(_guild);
+			
+			return guild.GetUser(snowflake);
+		} catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to get user {UserID} in guild {GuildID}", snowflake.ID, _guild);
+			return null;
+		}
+	}
+
+	public IEnumerable<IGuildUser> GetAllUsersWithRole(Snowflake roleId)
+	{
+		var guild = _socketClient.GetGuild(_guild);
+
+		return guild.GetRole(roleId).Members;
+	}
+	
+	public async IAsyncEnumerable<IMessage> GetMessages(IInstarGuild guild, DateTime afterTime)
     {
         Log.Debug("GetMessages({Guild}, {AfterTime})", guild.Id, afterTime);
         
         foreach (var channel in guild.TextChannels)
         {
             Log.Debug("Downloading #{Channel}", channel.Name);
-            // Reference message will be the "current"
-            // message we are looking at.  Since the
-            // GetMessagesAsync() method returns messages
-            // in order of newest to oldest, we can keep
-            // a running log of the oldest message we've
-            // encountered.
+            // Reference message will be the "current" message we are looking at.  Since the
+            // GetMessagesAsync() method returns messages in order of newest to oldest, we can keep
+            // a running log of the oldest message we've encountered.
             var refMessage = (await channel.GetMessagesAsync(1).FlattenAsync()).FirstOrDefault();
             if (refMessage is null)
                 continue;
@@ -255,6 +318,6 @@ public sealed class DiscordService : IDiscordService
         }
     }
 
-    public async Task<IChannel> GetChannel(Snowflake channelId)
+    public async Task<IChannel?> GetChannel(Snowflake channelId)
         => await _socketClient.GetChannelAsync(channelId);
 }

@@ -9,22 +9,15 @@ namespace PaxAndromeda.Instar.Wrappers;
 /// </summary>
 [ExcludeFromCodeCoverage(Justification = "Wrapper class")]
 [SuppressMessage("ReSharper", "ClassWithVirtualMembersNeverInherited.Global")]
-public class MessageCommandInteractionWrapper : IInstarMessageCommandInteraction
+public class MessageCommandInteractionWrapper(IMessageCommandInteraction interaction) : IInstarMessageCommandInteraction
 {
-    private readonly IMessageCommandInteraction _interaction;
-
-    public MessageCommandInteractionWrapper(IMessageCommandInteraction interaction)
-    {
-        _interaction = interaction;
-    }
-
-    public virtual ulong Id => _interaction.Id;
-    public virtual IUser User => _interaction.User;
-    public virtual IMessageCommandInteractionData Data => _interaction.Data;
+    public virtual ulong Id => interaction.Id;
+    public virtual IUser User => interaction.User;
+    public virtual IMessageCommandInteractionData Data => interaction.Data;
 
     public virtual Task RespondWithModalAsync<T>(string customId, RequestOptions options = null!,
         Action<ModalBuilder> modifyModal = null!) where T : class, IModal
     {
-        return _interaction.RespondWithModalAsync<T>(customId, options, modifyModal);
+        return interaction.RespondWithModalAsync<T>(customId, options, modifyModal);
     }
 }

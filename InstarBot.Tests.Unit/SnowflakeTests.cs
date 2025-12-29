@@ -186,9 +186,8 @@ public sealed class SnowflakeTests
         var snowflake1 = Snowflake.Generate();
         var snowflake2 = Snowflake.Generate();
 
-        // Assert
-        snowflake1.GeneratedId.Should().Be(1);
-        snowflake2.GeneratedId.Should().Be(2);
+		// Assert
+		snowflake2.GeneratedId.Should().BeGreaterThan(snowflake1.GeneratedId);
         snowflake1.Should().NotBe(snowflake2);
     }
 

@@ -3,9 +3,4 @@
 namespace PaxAndromeda.Instar;
 
 [ExcludeFromCodeCoverage]
-public sealed class ConfigurationException : Exception
-{
-    public ConfigurationException(string message) : base(message)
-    {
-    }
-}
+public sealed class ConfigurationException(string message) : Exception(message);

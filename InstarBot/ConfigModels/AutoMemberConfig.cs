@@ -3,15 +3,18 @@ using JetBrains.Annotations;
 
 namespace PaxAndromeda.Instar.ConfigModels;
 
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
+[SuppressMessage("ReSharper", "AutoPropertyCanBeMadeGetOnly.Global")]
+[UsedImplicitly]
 public sealed class AutoMemberConfig
 {
-    [SnowflakeType(SnowflakeType.Role)] public Snowflake HoldRole { get; set; } = null!;
-    [SnowflakeType(SnowflakeType.Channel)] public Snowflake IntroductionChannel { get; set; } = null!;
-    public int MinimumJoinAge { get; set; }
-    public int MinimumMessages { get; set; }
-    public int MinimumMessageTime { get; set; }
-    public List<RoleGroup> RequiredRoles { get; set; } = null!;
-    public bool EnableGaiusCheck { get; set; }
+    [SnowflakeType(SnowflakeType.Role)] public Snowflake HoldRole { get; init; } = null!;
+    [SnowflakeType(SnowflakeType.Channel)] public Snowflake IntroductionChannel { get; init; } = null!;
+    public int MinimumJoinAge { get; init; }
+    public int MinimumMessages { get; init; }
+    public int MinimumMessageTime { get; init; }
+    public List<RoleGroup> RequiredRoles { get; init; } = null!;
+    public bool EnableGaiusCheck { get; init; }
 }
 
 [UsedImplicitly]

@@ -1,10 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text;
 using Discord;
 using Discord.Interactions;
 using JetBrains.Annotations;
-using Microsoft.Extensions.Configuration;
-using PaxAndromeda.Instar.ConfigModels;
+using PaxAndromeda.Instar.DynamoModels;
+using PaxAndromeda.Instar.Embeds;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 using Serilog;
@@ -12,141 +11,95 @@ using Serilog;
 namespace PaxAndromeda.Instar.Commands;
 
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class CheckEligibilityCommand : BaseCommand
+public class CheckEligibilityCommand(
+    IDynamicConfigService dynamicConfig,
+    IAutoMemberSystem autoMemberSystem,
+	IDatabaseService ddbService,
+    IMetricService metricService)
+    : BaseCommand
 {
-    private readonly IDynamicConfigService _dynamicConfig;
-    private readonly AutoMemberSystem _autoMemberSystem;
-    private readonly IMetricService _metricService;
-
-    public CheckEligibilityCommand(IDynamicConfigService dynamicConfig, AutoMemberSystem autoMemberSystem,
-        IMetricService metricService)
-    {
-        _dynamicConfig = dynamicConfig;
-        _autoMemberSystem = autoMemberSystem;
-        _metricService = metricService;
-    }
-
     [UsedImplicitly]
     [SlashCommand("checkeligibility", "This command checks your membership eligibility.")]
     public async Task CheckEligibility()
     {
-        var config = await _dynamicConfig.GetConfig();
+        var config = await dynamicConfig.GetConfig();
         
         if (Context.User is null)
         {
             Log.Error("Checking eligibility, but Context.User is null");
-            await RespondAsync("An internal error has occurred.  Please try again later.", ephemeral: true);
+            await RespondAsync(Strings.Command_CheckEligibility_Error_Internal, ephemeral: true);
         }
 
         if (!Context.User!.RoleIds.Contains(config.MemberRoleID) && !Context.User!.RoleIds.Contains(config.NewMemberRoleID))
         {
-            await RespondAsync("You do not have the New Member or Member roles.  Please contact staff to have this corrected.", ephemeral: true);
+            await RespondAsync(Strings.Command_CheckEligibility_Error_NoMemberRoles, ephemeral: true);
             return;
         }
 
         if (Context.User!.RoleIds.Contains(config.MemberRoleID))
         {
-            await RespondAsync("You are already a member!", ephemeral: true);
+            await RespondAsync(Strings.Command_CheckEligibility_Error_AlreadyMember, ephemeral: true);
             return;
         }
-        
-        var eligibility = await _autoMemberSystem.CheckEligibility(Context.User);
+		
+		bool isDDBAMH = false;
+		try
+		{
+			var ddbUser = await ddbService.GetOrCreateUserAsync(Context.User);
+			isDDBAMH = ddbUser.Data.AutoMemberHoldRecord is not null;
+		} catch (Exception ex)
+		{
+			await metricService.Emit(Metric.AMS_DynamoFailures, 1);
+			Log.Error(ex, "Failed to retrieve AMH status for user {UserID} from DynamoDB", Context.User.Id);
+		}
 
-        Log.Debug("Building response embed...");
-        var fields = new List<EmbedFieldBuilder>();
-        if (eligibility.HasFlag(MembershipEligibility.NotEligible))
-        {
-            fields.Add(new EmbedFieldBuilder()
-                .WithName("Missing Items")
-                .WithValue(await BuildMissingItemsText(eligibility, Context.User)));
-        }
-
-        var nextRun = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month,
-                          DateTimeOffset.UtcNow.Day, DateTimeOffset.UtcNow.Hour, 0, 0, TimeSpan.Zero)
-                      + TimeSpan.FromHours(1);
-        var unixTime = nextRun.UtcTicks / 10000000-62135596800; // UTC ticks since year 0 to Unix Timestamp
-        
-        fields.Add(new EmbedFieldBuilder()
-            .WithName("Note")
-            .WithValue($"The Auto Member System will run <t:{unixTime}:R>. Membership eligibility is subject to change at the time of evaluation."));
-
-        var builder = new EmbedBuilder()
-            // Set up all the basic stuff first
-            .WithCurrentTimestamp()
-            .WithColor(0x0c94e0)
-            .WithFooter(new EmbedFooterBuilder()
-                .WithText("Instar Auto Member System System")
-                .WithIconUrl("https://spacegirl.s3.us-east-1.amazonaws.com/instar.png"))
-            .WithTitle("Membership Eligibility")
-            .WithDescription(BuildEligibilityText(eligibility))
-            .WithFields(fields);
+		if (Context.User!.RoleIds.Contains(config.AutoMemberConfig.HoldRole) || isDDBAMH)
+		{
+			// User is on hold
+			await RespondAsync(embed: new InstarCheckEligibilityAMHEmbed().Build(), ephemeral: true);
+			return;
+		}
 
         Log.Debug("Responding...");
-        await RespondAsync(embed: builder.Build(), ephemeral: true);
-        await _metricService.Emit(Metric.AMS_EligibilityCheck, 1);
+
+		var eligibility = autoMemberSystem.CheckEligibility(config, Context.User);
+
+		await RespondAsync(embed: new InstarCheckEligibilityEmbed(Context.User, eligibility, config).Build(), ephemeral: true);
+        await metricService.Emit(Metric.AMS_EligibilityCheck, 1);
     }
 
-    private async Task<string> BuildMissingItemsText(MembershipEligibility eligibility, IGuildUser user)
-    {
-        var config = await _dynamicConfig.GetConfig();
-        
-        if (eligibility == MembershipEligibility.Eligible)
-            return string.Empty;
-        
-        var missingItemsBuilder = new StringBuilder();
+	[UsedImplicitly]
+	[SlashCommand("eligibility", "Checks the eligibility of another user on the server.")]
+	public async Task CheckOtherEligibility(IUser user)
+	{
+		if (user is not IGuildUser guildUser)
+		{
+			await RespondAsync($"Cannot check the eligibility for {user.Id} since they are not on this server.", ephemeral: true);
+			return;
+		}
 
-        if (eligibility.HasFlag(MembershipEligibility.MissingRoles))
-        {
-            // What roles are we missing?
-            foreach (var roleGroup in config.AutoMemberConfig.RequiredRoles)
-            {
-                if (user.RoleIds.Intersect(roleGroup.Roles.Select(n => n.ID)).Any()) continue;
-                var prefix = "aeiouAEIOU".IndexOf(roleGroup.GroupName[0]) >= 0 ? "an" : "a"; // grammar hack :)
-                missingItemsBuilder.AppendLine(
-                    $"- You are missing {prefix} {roleGroup.GroupName.ToLowerInvariant()} role.");
-            }
-        }
+		var cfg = await dynamicConfig.GetConfig();
 
-        if (eligibility.HasFlag(MembershipEligibility.MissingIntroduction))
-            missingItemsBuilder.AppendLine($"- You have not posted an introduction in {Snowflake.GetMention(() => config.AutoMemberConfig.IntroductionChannel)}.");
+		var eligibility = autoMemberSystem.CheckEligibility(cfg, guildUser);
 
-        if (eligibility.HasFlag(MembershipEligibility.TooYoung))
-            missingItemsBuilder.AppendLine(
-                $"- You have not been on the server for {config.AutoMemberConfig.MinimumJoinAge / 3600} hours yet.");
+		AutoMemberHoldRecord? amhRecord = null;
+		bool hasError = false;
+		try
+		{
+			var dbUser = await ddbService.GetOrCreateUserAsync(guildUser);
+			if (dbUser.Data.AutoMemberHoldRecord is not null)
+			{
+				amhRecord = dbUser.Data.AutoMemberHoldRecord;
+			}
+		} catch (Exception ex)
+		{
+			Log.Error(ex, "Failed to retrieve user from DynamoDB while checking eligibility: {UserID}", user.Id);
 
-        if (eligibility.HasFlag(MembershipEligibility.PunishmentReceived))
-            missingItemsBuilder.AppendLine("- You have received a warning or moderator action.");
+			// Since we can't give exact details, we'll just note that there was an error
+			// and just confirm that the member's AMH status is unknown.
+			hasError = true;
+		}
 
-        if (eligibility.HasFlag(MembershipEligibility.NotEnoughMessages))
-            missingItemsBuilder.AppendLine($"- You have not posted {config.AutoMemberConfig.MinimumMessages} messages in the past {config.AutoMemberConfig.MinimumMessageTime/3600} hours.");
-
-        return missingItemsBuilder.ToString();
-    }
-
-    private static string BuildEligibilityText(MembershipEligibility eligibility)
-    {
-        var eligibilityBuilder = new StringBuilder();
-        eligibilityBuilder.Append(eligibility.HasFlag(MembershipEligibility.MissingRoles)
-            ? ":x:"
-            : ":white_check_mark:");
-        eligibilityBuilder.AppendLine(" **Roles**");
-        eligibilityBuilder.Append(eligibility.HasFlag(MembershipEligibility.MissingIntroduction)
-            ? ":x:"
-            : ":white_check_mark:");
-        eligibilityBuilder.AppendLine(" **Introduction**");
-        eligibilityBuilder.Append(eligibility.HasFlag(MembershipEligibility.TooYoung)
-            ? ":x:"
-            : ":white_check_mark:");
-        eligibilityBuilder.AppendLine(" **Join Age**");
-        eligibilityBuilder.Append(eligibility.HasFlag(MembershipEligibility.PunishmentReceived)
-            ? ":x:"
-            : ":white_check_mark:");
-        eligibilityBuilder.AppendLine(" **Mod Actions**");
-        eligibilityBuilder.Append(eligibility.HasFlag(MembershipEligibility.NotEnoughMessages)
-            ? ":x:"
-            : ":white_check_mark:");
-        eligibilityBuilder.AppendLine(" **Messages** (last 24 hours)");
-
-        return eligibilityBuilder.ToString();
-    }
+		await RespondAsync(embed: new InstarEligibilityEmbed(guildUser, eligibility, amhRecord, hasError).Build(), ephemeral: true);
+	}
 }

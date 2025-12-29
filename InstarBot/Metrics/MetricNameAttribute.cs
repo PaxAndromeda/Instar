@@ -1,12 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace PaxAndromeda.Instar.Metrics;
 
+[ExcludeFromCodeCoverage]
 [AttributeUsage(AttributeTargets.Field)]
-public sealed class MetricNameAttribute : Attribute
+public sealed class MetricNameAttribute(string name) : Attribute
 {
-    public string Name { get; }
-
-    public MetricNameAttribute(string name)
-    {
-        Name = name;
-    }
+    public string Name { get; } = name;
 }

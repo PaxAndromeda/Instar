@@ -1,11 +1,16 @@
 using System.Diagnostics.CodeAnalysis;
-using JetBrains.Annotations;
 
 namespace PaxAndromeda.Instar.Metrics;
 
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public enum Metric
 {
+	[MetricName("Schedule Deviation")]
+	ScheduledService_ScheduleDeviation,
+
+	[MetricName("Runtime")]
+	ScheduledService_ServiceRuntime,
+
     [MetricDimension("Service", "Paging System")]
     [MetricName("Pages Sent")]
     Paging_SentPages,
@@ -37,8 +42,28 @@ public enum Metric
     [MetricDimension("Service", "Auto Member System")]
     [MetricName("Users Granted Membership")]
     AMS_UsersGrantedMembership,
-    
-    [MetricDimension("Service", "Discord")]
+
+	[MetricDimension("Service", "Auto Member System")]
+	[MetricName("DynamoDB Failures")]
+	AMS_DynamoFailures,
+
+	[MetricDimension("Service", "Auto Member System")]
+	[MetricName("AMH Application Failures")]
+	AMS_AMHFailures,
+	
+	[MetricDimension("Service", "Auto Member System")]
+	[MetricName("Autokicks due to Forbidden Roles")]
+	AMS_ForbiddenRoleKicks,
+
+	[MetricDimension("Service", "Birthday System")]
+	[MetricName("Birthday System Failures")]
+	BirthdaySystem_Failures,
+
+	[MetricDimension("Service", "Birthday System")]
+	[MetricName("Birthday Grants")]
+	BirthdaySystem_Grants,
+
+	[MetricDimension("Service", "Discord")]
     [MetricName("Messages Sent")]
     Discord_MessagesSent,
     
@@ -52,6 +77,33 @@ public enum Metric
     
     [MetricDimension("Service", "Discord")]
     [MetricName("Users Left")]
-    [UsedImplicitly]
-    Discord_UsersLeft
+    Discord_UsersLeft,
+
+	[MetricDimension("Service", "Gaius")]
+	[MetricName("Gaius API Calls")]
+	Gaius_APICalls,
+
+	[MetricDimension("Service", "Gaius")]
+	[MetricName("Gaius API Latency")]
+	Gaius_APILatency,
+
+	[MetricDimension("Service", "Notifications")]
+	[MetricName("Malformed Notifications")]
+	Notification_MalformedNotification,
+
+	[MetricDimension("Service", "Notifications")]
+	[MetricName("Notifications Failed")]
+	Notification_NotificationsFailed,
+
+	[MetricDimension("Service", "Notifications")]
+	[MetricName("Notifications Sent")]
+	Notification_NotificationsSent,
+
+	[MetricDimension("Service", "Time")]
+	[MetricName("NTP Query Errors")]
+	NTP_Error,
+
+	[MetricDimension("Service", "Time")]
+	[MetricName("Clock Drift")]
+	NTP_Drift,
 }

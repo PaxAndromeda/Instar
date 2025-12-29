@@ -3,7 +3,7 @@ os: linux
 files:
   - source: Commands
     destination: /Instar/Commands
-  - source: InstarBot/bin/Release/net6.0
+  - source: InstarBot/bin/Release/net10.0
     destination: /Instar/bin
 hooks:
   ApplicationStop:
