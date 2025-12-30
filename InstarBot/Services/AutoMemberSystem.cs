@@ -412,8 +412,8 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 
         if (!_introductionPosters.ContainsKey(user.Id))
             eligibility |= MembershipEligibility.MissingIntroduction;
-
-        if (_recentMessages.TryGetValue(user.Id, out var messages) && messages < cfg.AutoMemberConfig.MinimumMessages)
+        
+        if (!_recentMessages.TryGetValue(user.Id, out var messages) || messages < cfg.AutoMemberConfig.MinimumMessages)
             eligibility |= MembershipEligibility.NotEnoughMessages;
 
         if (_punishedUsers.ContainsKey(user.Id))
