@@ -411,10 +411,10 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
             eligibility |= MembershipEligibility.MissingRoles;
 
         if (!_introductionPosters.ContainsKey(user.Id))
-            eligibility |=  MembershipEligibility.MissingIntroduction;
+            eligibility |= MembershipEligibility.MissingIntroduction;
 
         if (_recentMessages.TryGetValue(user.Id, out var messages) && messages < cfg.AutoMemberConfig.MinimumMessages)
-            eligibility |=  MembershipEligibility.NotEnoughMessages;
+            eligibility |= MembershipEligibility.NotEnoughMessages;
 
         if (_punishedUsers.ContainsKey(user.Id))
             eligibility |= MembershipEligibility.PunishmentReceived;
@@ -427,7 +427,7 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 		if (eligibility != MembershipEligibility.Eligible)
 			eligibility &= ~MembershipEligibility.Eligible;
         
-		Log.Verbose("User {User} ({UserID}) membership eligibility: {Eligibility}", user.Username, user.Id, eligibility);
+		Log.Debug("User {User} ({UserID}) membership eligibility: {Eligibility}", user.Username, user.Id, eligibility);
         return eligibility;
     }
 
