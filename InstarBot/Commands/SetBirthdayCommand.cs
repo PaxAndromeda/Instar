@@ -136,7 +136,7 @@ public class SetBirthdayCommand(IDatabaseService ddbService, IDynamicConfigServi
 				await birthdaySystem.GrantUnexpectedBirthday(Context.User, birthday);
 			}
 
-			var extrapolatedBirthday = birthday.Observed;
+			var extrapolatedBirthday = birthday.Next;
 			var dateStr = unspecifiedDate.ToString("MMMM dnn", true);
 
 			await RespondAsync(string.Format(Strings.Command_SetBirthday_Success, dateStr, extrapolatedBirthday.ToUnixTimeSeconds()), ephemeral: true);

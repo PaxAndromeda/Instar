@@ -32,6 +32,27 @@ public record Birthday(DateTimeOffset Birthdate, TimeProvider TimeProvider)
 	}
 
 	/// <summary>
+	/// Gets the date of the next birthday.
+	/// </summary>
+	/// <remarks>
+	///	Internally this just returns <see cref="Observed"/>, but will add a year if the
+	/// value is in the past.  As such, <see cref="Next"/> is always in the future.
+	/// </remarks>
+	public DateTimeOffset Next
+	{
+		get
+		{
+			var observed = Observed;
+			var now = TimeProvider.GetUtcNow().ToOffset(Observed.Offset);
+
+			if (observed < now)
+				observed = observed.AddYears(1);
+
+			return observed;
+		}
+	}
+
+	/// <summary>
 	/// Gets the age, in years, calculated from the Birthdate to the current date.
 	/// </summary>
 	/// <remarks>
