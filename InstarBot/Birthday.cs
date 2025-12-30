@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PaxAndromeda.Instar;
 
@@ -28,6 +28,27 @@ public record Birthday(DateTimeOffset Birthdate, TimeProvider TimeProvider)
 			return new DateTimeOffset(now.Year, birthdayNormalized.Month, birthdayNormalized.Day,
 				birthdayNormalized.Hour, birthdayNormalized.Minute, birthdayNormalized.Second,
 				birthdayNormalized.Offset);
+		}
+	}
+
+	/// <summary>
+	/// Gets the date of the next birthday.
+	/// </summary>
+	/// <remarks>
+	///	Internally this just returns <see cref="Observed"/>, but will add a year if the
+	/// value is in the past.  As such, <see cref="Next"/> is always in the future.
+	/// </remarks>
+	public DateTimeOffset Next
+	{
+		get
+		{
+			var observed = Observed;
+			var now = TimeProvider.GetUtcNow().ToOffset(Observed.Offset);
+
+			if (observed < now)
+				observed = observed.AddYears(1);
+
+			return observed;
 		}
 	}
 

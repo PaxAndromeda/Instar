@@ -104,8 +104,8 @@ internal static class Program
             {
                 LogGroupName = cwSection.GetValue<string>("LogGroup"),
                 TextFormatter = new JsonFormatter(renderMessage: true),
-                MinimumLogEventLevel = LogEventLevel.Information
-            }, cwClient);
+                MinimumLogEventLevel = requestedLogLevel ?? LogEventLevel.Information
+			}, cwClient);
         }
 
         Log.Logger = logCfg.CreateLogger();

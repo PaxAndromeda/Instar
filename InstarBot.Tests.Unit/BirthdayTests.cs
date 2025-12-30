@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using FluentAssertions;
 using Moq;
 using PaxAndromeda.Instar;
@@ -90,5 +90,20 @@ public class BirthdayTests
 		var expectedTime = DateTimeOffset.Parse(expectedObservedDate);
 
 		birthday.Observed.Should().Be(expectedTime);
+	}
+
+	[Theory]
+	[InlineData("2025-06-15T00:00:00Z", "1990-07-01T00:00:00Z", "2025-07-01T00:00:00Z")] // birthday later in year
+	[InlineData("2025-08-15T00:00:00Z", "1990-07-01T00:00:00Z", "2026-07-01T00:00:00Z")] // birthday earlier in year
+	[InlineData("2024-02-15T00:00:00Z", "1992-02-29T00:00:00Z", "2024-02-29T00:00:00Z")] // leap year birthday on leap year
+	[InlineData("2025-02-15T00:00:00Z", "1992-02-29T00:00:00Z", "2025-02-28T00:00:00Z")] // leap year birthday on non-leap year
+	public void Next_ShouldReturnThisYearsBirthday(string currentTime, string birthdate, string expectedObservedDate)
+	{
+		var timeProvider = GetTimeProvider(DateTime.Parse(currentTime));
+		var birthday = new Birthday(DateTimeOffset.Parse(birthdate), timeProvider);
+
+		var expectedTime = DateTimeOffset.Parse(expectedObservedDate);
+
+		birthday.Next.Should().Be(expectedTime);
 	}
 }
