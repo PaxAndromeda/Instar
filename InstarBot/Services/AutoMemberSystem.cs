@@ -151,7 +151,9 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
     {
         var cfg = await _dynamicConfig.GetConfig();
         
-        var dbUser = await _ddbService.GetUserAsync(user.Id);
+		await HandleAutoKickRoles(user, cfg);
+
+		var dbUser = await _ddbService.GetUserAsync(user.Id);
         if (dbUser is null)
         {
             // Let's create a new user
@@ -228,23 +230,28 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 			await user.CommitAsync();
 		}
 
+		await HandleAutoKickRoles(arg.After);
+	}
+
+	private async Task HandleAutoKickRoles(IGuildUser user, InstarDynamicConfiguration? cfg = null)
+	{
 		// Does the user have any of the auto kick roles?
 		try
 		{
-			var cfg = await _dynamicConfig.GetConfig();
+			cfg ??= await _dynamicConfig.GetConfig();
 
 			if (cfg.AutoKickRoles is null)
 				return;
 
-			if (!cfg.AutoKickRoles.ContainsAny(arg.After.RoleIds.Select(n => new Snowflake(n)).ToArray()))
+			if (!cfg.AutoKickRoles.ContainsAny(user.RoleIds.Select(n => new Snowflake(n)).ToArray()))
 				return;
 
-			await arg.After.KickAsync("Automatically kicked for having a forbidden role.");
+			await user.KickAsync("Automatically kicked for having a forbidden role.");
 			await _metricService.Emit(Metric.AMS_ForbiddenRoleKicks, 1);
 		}
 		catch (Exception ex)
 		{
-			Log.Error(ex, "Failed to determine if user {UserID} has any forbidden roles.", arg.ID.ID);
+			Log.Error(ex, "Failed to determine if user {UserID} has any forbidden roles.", user.Id);
 		}
 	}
     
