@@ -154,6 +154,12 @@ public sealed class BirthdaySystem (
 					continue;
 				}
 
+				if (guildUser.RoleIds.Contains(cfg.BirthdayConfig.BirthdayRole.ID))
+				{
+					// already has the role, skip
+					continue;
+				}
+
 				toMention.Add(userId);
 
 				await GrantBirthdayRole(cfg, guildUser, result.Data.Birthday);
