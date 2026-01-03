@@ -316,6 +316,10 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 					if (!eligibleMembers.TryGetValue(id, out var user))
 						throw new BadStateException("Unexpected state: expected ID is missing from eligibleMembers");
 
+					// Skip if the user has an AMH
+					if (dbUser.Data.AutoMemberHoldRecord is not null)
+						continue;
+
 					await GrantMembership(cfg, user, dbUser);
 					membershipGrants++;
 
