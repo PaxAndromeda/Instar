@@ -223,7 +223,10 @@
     <comment>{0} is the target user ID.</comment>
   </data>
   <data name="Command_Eligibility_HoldFormat" xml:space="preserve">
-    <value>**Mod:** &lt;@{0}&gt;\r\n**Reason:**\r\n```{1}```\r\n**Date:** &lt;t:{2}:f&gt; (&lt;t:{2}:R&gt;)</value>
+    <value>**Mod:** &lt;@{0}&gt;
+**Reason:**
+```{1}```
+**Date:** &lt;t:{2}:f&gt; (&lt;t:{2}:R&gt;)</value>
     <comment>{0} is the moderator ID, {1} is the reason, and {2} is the unix timestamp of the issue date in seconds</comment>
   </data>
   <data name="Command_AutoMemberHold_Error_AMHAlreadyExists" xml:space="preserve">
