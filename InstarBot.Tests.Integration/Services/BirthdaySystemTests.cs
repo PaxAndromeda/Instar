@@ -211,15 +211,20 @@ public static class BirthdaySystemTests
 	{
 		// Arrange
 		var birthday = DateTime.Parse("2000-02-13T12:00:00Z");
-		var today = DateTime.Parse("2025-02-14T00:00:00Z");
+		var currentTime = DateTime.Parse("2025-02-14T00:00:00Z");
 
-		var orchestrator = await SetupOrchestrator(today, birthday);
+		var orchestrator = await SetupOrchestrator(currentTime, birthday);
 		var system = orchestrator.GetService<IBirthdaySystem>();
+
 
 		// Add the birthday role
 		await orchestrator.Subject.AddRoleAsync(orchestrator.Configuration.BirthdayConfig.BirthdayRole);
 
 		// Pre assert
+		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
+		dbUser.Should().NotBeNull();
+		dbUser.Data.Birthday!.IsToday.Should().BeTrue();
+
 		orchestrator.Subject.RoleIds.Should().Contain(orchestrator.Configuration.BirthdayConfig.BirthdayRole);
 
 		// Act
