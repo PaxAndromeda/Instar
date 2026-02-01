@@ -369,7 +369,10 @@ namespace PaxAndromeda.Instar {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to **Mod:** &lt;@{0}&gt;\r\n**Reason:**\r\n```{1}```\r\n**Date:** &lt;t:{2}:f&gt; (&lt;t:{2}:R&gt;).
+        ///   Looks up a localized string similar to **Mod:** &lt;@{0}&gt;
+        ///**Reason:**
+        ///```{1}```
+        ///**Date:** &lt;t:{2}:f&gt; (&lt;t:{2}:R&gt;).
         /// </summary>
         public static string Command_Eligibility_HoldFormat {
             get {

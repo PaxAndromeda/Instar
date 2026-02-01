@@ -86,6 +86,14 @@ public sealed class BirthdaySystem (
 		{
 			if (user.Data.Birthday is null)
 			{
+				Log.Information("Removing birthday role from {UserID} due to their birthday not being set in DynamoDB (user.Data.Birthday is null)", user.Data.UserID);
+				toRemove.Add(user.Data.UserID!);
+				continue;
+			}
+
+			if (!user.Data.Birthday?.IsToday ?? false)
+			{
+				Log.Information("Removing birthday role from {UserID} due to their birthday not being today.  IsToday={IsToday}", user.Data.UserID, user.Data.Birthday.IsToday);
 				toRemove.Add(user.Data.UserID!);
 				continue;
 			}
@@ -99,9 +107,11 @@ public sealed class BirthdaySystem (
 			if (thisYearBirthday > currentTime)
 				thisYearBirthday = thisYearBirthday.AddYears(-1);
 
-
 			if (currentTime - thisYearBirthday >= TimeSpan.FromDays(1))
+			{
+				Log.Information("Removing birthday role from {UserID} due to their birthday not being today.  CurrentTime={CurrentTime}, ThisYearBirthday={ThisYearBirthday}, Diff={TimeDiff}", user.Data.UserID, currentTime, thisYearBirthday, currentTime - thisYearBirthday);
 				toRemove.Add(user.Data.UserID!);
+			}
 		}
 
 		foreach (var snowflake in toRemove)
