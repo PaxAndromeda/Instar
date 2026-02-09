@@ -87,6 +87,7 @@ public sealed class DiscordService : IDiscordService
         _socketClient.MessageDeleted += async (msgCache, _) => await _messageDeletedEvent.Invoke(msgCache.Id);
         _socketClient.UserJoined += async user => await _userJoinedEvent.Invoke(user);
 		_socketClient.UserLeft += async (_, user) => await _userLeftEvent.Invoke(user);
+		_socketClient.UserUpdated += HandleUserUpdate;
 		_socketClient.GuildMemberUpdated += HandleUserUpdate;
         _interactionService.Log += HandleDiscordLog;
 
@@ -97,19 +98,29 @@ public sealed class DiscordService : IDiscordService
         // Validate
         if (_guild == 0)
             throw new ConfigurationException("TargetGuild is not set");
-    }
+	}
 
-	private async Task HandleUserUpdate(Cacheable<SocketGuildUser, ulong> before, SocketGuildUser after)
+	private Task HandleUserUpdate(Cacheable<SocketGuildUser, ulong> before, SocketGuildUser after)
 	{
 		// Can't do anything if we don't have a before state.
 		// In the case of a user join, that is handled in UserJoined event.
 		if (!before.HasValue)
-			return;
+			return Task.CompletedTask;
 
-		await _userUpdatedEvent.Invoke(new UserUpdatedEventArgs(after.Id, before.Value, after));
+		return HandleUserUpdate(before.Value, after);
 	}
 
-    private async Task HandleMessageCommand(SocketMessageCommand arg)
+	private async Task HandleUserUpdate(SocketGuildUser before, SocketGuildUser after)
+	{
+		await _userUpdatedEvent.Invoke(new UserUpdatedEventArgs(after.Id, before, after));
+	}
+
+	private async Task HandleUserUpdate(SocketUser before, SocketUser after)
+	{
+		await _userUpdatedEvent.Invoke(new UserUpdatedEventArgs(after.Id, before, after));
+	}
+
+	private async Task HandleMessageCommand(SocketMessageCommand arg)
     {
         Log.Information("Message command: {CommandName}", arg.CommandName);
 

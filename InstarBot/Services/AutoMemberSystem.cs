@@ -192,13 +192,17 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 		if (!arg.HasUpdated)
 			return;
 
+		if (arg.After is not IGuildUser gAfter)
+			return;
+
 		var user = await _ddbService.GetUserAsync(arg.ID);
 		if (user is null)
 		{
+
 			// new user for the database, create from the latest data and return
 			try
 			{
-				await _ddbService.CreateUserAsync(InstarUserData.CreateFrom(arg.After));
+				await _ddbService.CreateUserAsync(InstarUserData.CreateFrom(gAfter));
 				Log.Information("Created new user {Username} (user ID {UserID})", arg.After.Username, arg.ID);
 			}
 			catch (Exception ex)
@@ -217,10 +221,13 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 			user.Data.Username = arg.After.Username;
 			changed = true;
 		}
+		
+		if (arg.Before is not IGuildUser gBefore)
+			return;
 
-		if (arg.Before.Nickname != arg.After.Nickname)
+		if (gBefore.Nickname != gAfter.Nickname)
 		{
-			user.Data.Nicknames?.Add(new InstarUserDataHistoricalEntry<string>(_timeProvider.GetUtcNow().UtcDateTime, arg.After.Nickname));
+			user.Data.Nicknames?.Add(new InstarUserDataHistoricalEntry<string>(_timeProvider.GetUtcNow().UtcDateTime, gAfter.Nickname));
 			changed = true;
 		}
 
@@ -230,7 +237,7 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
 			await user.CommitAsync();
 		}
 
-		await HandleAutoKickRoles(arg.After);
+		await HandleAutoKickRoles(gAfter);
 	}
 
 	private async Task HandleAutoKickRoles(IGuildUser user, InstarDynamicConfiguration? cfg = null)
