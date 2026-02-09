@@ -24,9 +24,6 @@ public record Birthday(DateTimeOffset Birthdate, TimeProvider TimeProvider)
 		get
 		{
 			var birthdayNormalized = Normalize(Birthdate);
-
-			Log.Verbose("Birthdate = {Birthdate}", Birthdate);
-			Log.Verbose("birthdayNormalized = {birthdayNormalized}", birthdayNormalized);
 			var now = TimeProvider.GetUtcNow().ToOffset(birthdayNormalized.Offset);
 
 			return new DateTimeOffset(now.Year, birthdayNormalized.Month, birthdayNormalized.Day,
@@ -97,16 +94,8 @@ public record Birthday(DateTimeOffset Birthdate, TimeProvider TimeProvider)
 			var utcOffset = Observed.Offset;
 			var currentLocalTime = dtNow.ToOffset(utcOffset);
 
-			Log.Verbose("dtNow = {dtNow}", dtNow);
-			Log.Verbose("observed = {observed}", Observed);
-			Log.Verbose("utcOffset = {utcOffset}", utcOffset);
-			Log.Verbose("currentLocalTime = {currentLocalTime}", currentLocalTime);
-
 			var localTimeToday = new DateTimeOffset(currentLocalTime.Date, currentLocalTime.Offset);
 			var localTimeTomorrow = localTimeToday.AddDays(1);
-
-			Log.Verbose("localTimeToday = {localTimeToday}", localTimeToday);
-			Log.Verbose("localTimeTomorrow = {localTimeTomorrow}", localTimeTomorrow);
 
 			return Observed >= localTimeToday && Observed < localTimeTomorrow;
 		}
