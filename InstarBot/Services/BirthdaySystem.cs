@@ -36,6 +36,8 @@ public sealed class BirthdaySystem (
 		var cfg = await dynamicConfig.GetConfig();
 		var currentTime = _timeProvider.GetUtcNow().UtcDateTime;
 
+		await discord.SyncUsers();
+
 		await RemoveBirthdays(cfg, currentTime);
 		var successfulAdds = await GrantBirthdays(cfg, currentTime);
 
