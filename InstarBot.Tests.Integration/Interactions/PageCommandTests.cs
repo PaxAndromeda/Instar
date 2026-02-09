@@ -14,7 +14,7 @@ public static class PageCommandTests
 {
 	private const string TestReason = "Test reason for paging";
 
-    private static async Task<TestOrchestrator> SetupOrchestrator(PageCommandTestContext context)
+	private static async Task<TestOrchestrator> SetupOrchestrator(PageCommandTestContext context)
     {
 		var orchestrator = TestOrchestrator.Default;
 

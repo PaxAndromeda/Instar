@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
+using Serilog;
 
 namespace PaxAndromeda.Instar;
 
@@ -94,7 +95,7 @@ public record Birthday(DateTimeOffset Birthdate, TimeProvider TimeProvider)
 			var currentLocalTime = dtNow.ToOffset(utcOffset);
 
 			var localTimeToday = new DateTimeOffset(currentLocalTime.Date, currentLocalTime.Offset);
-			var localTimeTomorrow = localTimeToday.Date.AddDays(1);
+			var localTimeTomorrow = localTimeToday.AddDays(1);
 
 			return Observed >= localTimeToday && Observed < localTimeTomorrow;
 		}

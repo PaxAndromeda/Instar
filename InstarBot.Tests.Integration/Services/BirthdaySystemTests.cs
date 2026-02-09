@@ -4,6 +4,7 @@ using InstarBot.Test.Framework.Models;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Services;
+using Serilog;
 using Xunit;
 using Metric = PaxAndromeda.Instar.Metrics.Metric;
 
@@ -68,7 +69,7 @@ public static class BirthdaySystemTests
 		var channel = await orchestrator.Discord.GetChannel(orchestrator.Configuration.BirthdayConfig.BirthdayAnnounceChannel) as TestChannel;
 		channel.Should().NotBeNull();
 
-		var messages = await channel.GetMessagesAsync().SelectMany(n => n).ToListAsync();
+		var messages = await channel.GetMessagesAsync().SelectMany(n => n).ToListAsync(TestContext.Current.CancellationToken);
 		messages.Count.Should().BeGreaterThan(0);
 		TestUtilities.MatchesFormat(Strings.Birthday_Announcement, messages[0].Content);
 		
@@ -153,7 +154,7 @@ public static class BirthdaySystemTests
 		var channel = await orchestrator.Discord.GetChannel(orchestrator.Configuration.BirthdayConfig.BirthdayAnnounceChannel) as TestChannel;
 		channel.Should().NotBeNull();
 
-		var messages = await channel.GetMessagesAsync().SelectMany(n => n).ToListAsync();
+		var messages = await channel.GetMessagesAsync().SelectMany(n => n).ToListAsync(TestContext.Current.CancellationToken);
 		messages.Count.Should().Be(0);
 	}
 
@@ -210,8 +211,8 @@ public static class BirthdaySystemTests
 	public static async Task BirthdaySystem_WithUserBirthdayStill_ShouldKeepBirthdayRoles()
 	{
 		// Arrange
-		var birthday = DateTime.Parse("2000-02-13T12:00:00Z");
-		var currentTime = DateTime.Parse("2025-02-14T00:00:00Z");
+		var birthday = DateTimeOffset.Parse("2000-02-13T00:00:00-08:00");
+		var currentTime = DateTimeOffset.Parse("2025-02-14T00:00:00Z");
 
 		var orchestrator = await SetupOrchestrator(currentTime, birthday);
 		var system = orchestrator.GetService<IBirthdaySystem>();

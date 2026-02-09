@@ -15,7 +15,7 @@ public class AsyncAutoResetEventTests
 		var ev = new AsyncAutoResetEvent(true);
 
 		// Act
-		var task = ev.WaitAsync();
+		var task = ev.WaitAsync(TestContext.Current.CancellationToken);
 
 		// Assert
 		task.IsCompleted.Should().BeTrue();
@@ -26,8 +26,8 @@ public class AsyncAutoResetEventTests
 	{
 		var ev = new AsyncAutoResetEvent(false);
 
-		var waiter1 = ev.WaitAsync();
-		var waiter2 = ev.WaitAsync();
+		var waiter1 = ev.WaitAsync(TestContext.Current.CancellationToken);
+		var waiter2 = ev.WaitAsync(TestContext.Current.CancellationToken);
 
 		// First Set should release only one waiter.
 		ev.Set();
@@ -49,13 +49,13 @@ public class AsyncAutoResetEventTests
 		// No waiters now — Set should mark the event signaled so the next WaitAsync completes immediately.
 		ev.Set();
 
-		var immediate = ev.WaitAsync();
+		var immediate = ev.WaitAsync(TestContext.Current.CancellationToken);
 
 		// WaitAsync should complete immediately after Set() when there were no waiters
 		immediate.IsCompleted.Should().BeTrue();
 
 		// That consumption should reset the event; a subsequent waiter should block.
-		var next = ev.WaitAsync();
+		var next = ev.WaitAsync(TestContext.Current.CancellationToken);
 
 		next.IsCompleted.Should().BeFalse();
 	}

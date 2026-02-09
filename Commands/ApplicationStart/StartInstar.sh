@@ -12,7 +12,7 @@ startInstar() {
   
   local INSTAR_CONF="/Instar/bin/Config/$INSTAR_CONF_FILE"
 
-  /Instar/bin/InstarBot --config-path "$INSTAR_CONF" > /dev/null 2> /dev/null < /dev/null &
+  /Instar/bin/InstarBot --config-path "$INSTAR_CONF" --level Debug > /dev/null 2> /dev/null < /dev/null &
 }
 
 startInstar

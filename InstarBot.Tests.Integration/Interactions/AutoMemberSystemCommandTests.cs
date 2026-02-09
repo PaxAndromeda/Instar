@@ -149,7 +149,7 @@ public static class AutoMemberSystemCommandTests
 
 		// There is a potential asynchronous delay here, so let's keep waiting for this condition for 5 seconds.
 		await Task.WhenAny(
-			Task.Delay(5000),
+			Task.Delay(5000, TestContext.Current.CancellationToken),
 			Task.Factory.StartNew(async () =>
 			{
 				while (true)
@@ -160,7 +160,7 @@ public static class AutoMemberSystemCommandTests
 					// only poll once every 50ms
 					await Task.Delay(50);
 				}
-			}));
+			}, TestContext.Current.CancellationToken));
 	}
 
 	[Fact]

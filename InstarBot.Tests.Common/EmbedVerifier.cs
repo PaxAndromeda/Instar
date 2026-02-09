@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using Discord;
 using Serilog;
+using Xunit;
 
 namespace InstarBot.Tests;
 

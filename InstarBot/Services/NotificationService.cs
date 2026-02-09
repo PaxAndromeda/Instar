@@ -64,6 +64,17 @@ public class NotificationService (
 
 			var actor = discordService.GetUser(notification.Data.Actor);
 
+			// Don't post a notification if the reference user (if set) is not on the server.
+			if (notification.Data.ReferenceUser is not null)
+			{
+				var referenceUser = discordService.GetUser(notification.Data.ReferenceUser);
+				if (referenceUser is null)
+				{
+					Log.Warning("Reference user {ReferenceUserId} for notification dated {NotificationDate} not found on the server; skipping notification", notification.Data.ReferenceUser, notification.Data.Date);
+					return true;
+				}
+			}
+
 			Log.Debug("Actor ID {UserId} name: {Username}", notification.Data.Actor.ID, actor?.Username ?? "<unknown>");
 			
 			var embed = new NotificationEmbed(notification.Data, actor, cfg);
