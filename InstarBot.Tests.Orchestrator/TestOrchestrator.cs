@@ -112,6 +112,7 @@ namespace InstarBot.Test.Framework
 			Log.Logger = new LoggerConfiguration()
 				.Enrich.FromLogContext()
 				.MinimumLevel.Is(LogEventLevel.Verbose)
+				.WriteTo.Console()
 				.WriteTo.XUnit3TestOutput()
 				.CreateLogger()
 				.ForContext<T>();
