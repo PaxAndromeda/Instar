@@ -11,13 +11,8 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Services;
 
-public class NotificationSystemTests
+public static class NotificationSystemTests
 {
-	public NotificationSystemTests(ITestOutputHelper testOutputHelper)
-	{
-		TestOrchestrator.SetupLogging<NotificationSystemTests>(testOutputHelper);
-	}
-
 	private static async Task<TestOrchestrator> SetupOrchestrator()
 	{
 		return await TestOrchestrator.Builder

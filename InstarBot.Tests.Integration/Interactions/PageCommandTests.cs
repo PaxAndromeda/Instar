@@ -10,14 +10,9 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public class PageCommandTests
+public static class PageCommandTests
 {
 	private const string TestReason = "Test reason for paging";
-
-	public PageCommandTests(ITestOutputHelper testOutputHelper)
-	{
-		TestOrchestrator.SetupLogging<PageCommandTests>(testOutputHelper);
-	}
 
 	private static async Task<TestOrchestrator> SetupOrchestrator(PageCommandTestContext context)
     {

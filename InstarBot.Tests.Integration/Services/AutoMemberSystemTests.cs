@@ -12,7 +12,7 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Services;
 
-public class AutoMemberSystemTests
+public static class AutoMemberSystemTests
 {
     private static readonly Snowflake NewMember = new(796052052433698817);
     private static readonly Snowflake Member = new(793611808372031499);
@@ -20,11 +20,6 @@ public class AutoMemberSystemTests
     private static readonly Snowflake TwentyOnePlus = new(796148869855576064);
     private static readonly Snowflake SheHer = new(796578609535647765);
     private static readonly Snowflake AutoMemberHold = new(966434762032054282);
-
-	public AutoMemberSystemTests(ITestOutputHelper testOutputHelper)
-	{
-		TestOrchestrator.SetupLogging<AutoMemberSystemTests>(testOutputHelper);
-	}
 
 	private static async Task<TestOrchestrator> SetupOrchestrator(AutoMemberSystemContext context)
 	{

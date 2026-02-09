@@ -9,13 +9,8 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public class SetBirthdayCommandTests
+public static class SetBirthdayCommandTests
 {
-	public SetBirthdayCommandTests(ITestOutputHelper testOutputHelper)
-	{
-		TestOrchestrator.SetupLogging<SetBirthdayCommandTests>(testOutputHelper);
-	}
-
 	private static async Task<TestOrchestrator> SetupOrchestrator(bool throwError = false)
 	{
 		var orchestrator = TestOrchestrator.Default;

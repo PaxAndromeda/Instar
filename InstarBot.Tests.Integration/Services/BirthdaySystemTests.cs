@@ -10,13 +10,8 @@ using Metric = PaxAndromeda.Instar.Metrics.Metric;
 
 namespace InstarBot.Tests.Integration.Services;
 
-public class BirthdaySystemTests
+public static class BirthdaySystemTests
 {
-	public BirthdaySystemTests(ITestOutputHelper testOutputHelper)
-	{
-		TestOrchestrator.SetupLogging<BirthdaySystemTests>(testOutputHelper);
-	}
-
 	private static async Task<TestOrchestrator> SetupOrchestrator(DateTimeOffset currentTime, DateTimeOffset? birthdate = null)
 	{
 		var orchestrator = await TestOrchestrator.Builder

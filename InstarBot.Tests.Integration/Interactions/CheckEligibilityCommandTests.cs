@@ -12,13 +12,8 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public class CheckEligibilityCommandTests
+public static class CheckEligibilityCommandTests
 {
-	public CheckEligibilityCommandTests(ITestOutputHelper testOutputHelper)
-	{
-		TestOrchestrator.SetupLogging<CheckEligibilityCommandTests>(testOutputHelper);
-	}
-
 	private static TestOrchestrator SetupOrchestrator(MembershipEligibility eligibility)
 	{
 		var orchestrator = TestOrchestrator.Default;

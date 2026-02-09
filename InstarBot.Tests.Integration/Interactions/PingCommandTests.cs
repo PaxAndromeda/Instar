@@ -4,13 +4,8 @@ using PaxAndromeda.Instar.Commands;
 namespace InstarBot.Tests.Integration.Interactions;
 using Xunit;
 
-public class PingCommandTests
+public static class PingCommandTests
 {
-	public PingCommandTests(ITestOutputHelper testOutputHelper)
-	{
-		TestOrchestrator.SetupLogging<PingCommandTests>(testOutputHelper);
-	}
-
 	/// <summary>
 	/// Tests that the ping command emits an ephemeral "Pong!" response.
 	/// </summary>

@@ -9,13 +9,8 @@ using Xunit;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public class ReportUserTests
+public static class ReportUserTests
 {
-	public ReportUserTests(ITestOutputHelper testOutputHelper)
-	{
-		TestOrchestrator.SetupLogging<ReportUserTests>(testOutputHelper);
-	}
-
 	private static TestOrchestrator SetupOrchestrator(ReportContext context)
 	{
 		var orchestrator = TestOrchestrator.Default;
