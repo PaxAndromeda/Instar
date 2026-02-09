@@ -64,22 +64,23 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
             await PreloadGaiusPunishments();
     }
 
-	/// <summary>
-	/// Filters warnings and caselogs to only focus on the ones we care about. For example, we don't
-	/// want to withhold membership from someone who was kicked for having a too new Discord account.
-	/// </summary>
-	/// <param name="warnings">A collection of warnings retrieved from the Gaius API.</param>
-	/// <param name="caselogs">A collection of caselogs retrieved from the Gaius API.</param>
-	/// <returns>A tuple containing the filtered warnings and caselogs, respectively.</returns>
-	/// <exception cref="ArgumentNullException">If <paramref name="warnings"/> or <paramref name="caselogs"/> is null.</exception>
-	private static (IEnumerable<Warning>, IEnumerable<Caselog>) FilterPunishments(IEnumerable<Warning> warnings, IEnumerable<Caselog> caselogs)
+    /// <summary>
+    /// Filters warnings and caselogs to only focus on the ones we care about. For example, we don't
+    /// want to withhold membership from someone who was kicked for having a too new Discord account.
+    /// </summary>
+    /// <param name="cfg">The current configuration version in use.</param>
+    /// <param name="warnings">A collection of warnings retrieved from the Gaius API.</param>
+    /// <param name="caselogs">A collection of caselogs retrieved from the Gaius API.</param>
+    /// <returns>A tuple containing the filtered warnings and caselogs, respectively.</returns>
+    /// <exception cref="ArgumentNullException">If <paramref name="warnings"/> or <paramref name="caselogs"/> is null.</exception>
+    private static (IEnumerable<Warning>, IEnumerable<Caselog>) FilterPunishments(InstarDynamicConfiguration cfg, IEnumerable<Warning> warnings, IEnumerable<Caselog> caselogs)
 	{
 		if (warnings is null)
 			throw new ArgumentNullException(nameof(warnings));
 		if (caselogs is null)
 			throw new ArgumentNullException(nameof(caselogs));
-
-		var filteredCaselogs = caselogs.Where(n => n is not { Type: CaselogType.Kick, Reason: "Join age punishment" });
+		
+		var filteredCaselogs = caselogs.Where(n => n.Type != CaselogType.Kick && !cfg.AutoMemberConfig.AllowedPunishmentReasons.Contains(n.Reason));
 
 		return (warnings, filteredCaselogs);
 	}
@@ -92,9 +93,11 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
         // bias for an hour and a half ago.
         var afterTime = _timeProvider.GetUtcNow().UtcDateTime - TimeSpan.FromHours(1.5);
 
+		var cfg = await _dynamicConfig.GetConfig();
+
 		try
 		{
-			var (warnings, caselogs) = FilterPunishments(
+			var (warnings, caselogs) = FilterPunishments(cfg,
 				await _gaiusApiService.GetWarningsAfter(afterTime),
 				await _gaiusApiService.GetCaselogsAfter(afterTime));
 
@@ -480,9 +483,11 @@ public sealed class AutoMemberSystem : ScheduledService, IAutoMemberSystem
     
     private async Task PreloadGaiusPunishments()
     {
+		var cfg = await _dynamicConfig.GetConfig();
+
 		try
 		{
-			var (warnings, caselogs) = FilterPunishments(
+			var (warnings, caselogs) = FilterPunishments(cfg,
 				await _gaiusApiService.GetAllWarnings(),
 				await _gaiusApiService.GetAllCaselogs());
 
