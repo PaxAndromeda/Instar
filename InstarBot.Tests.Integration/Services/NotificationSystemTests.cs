@@ -8,7 +8,6 @@ using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Services;
 

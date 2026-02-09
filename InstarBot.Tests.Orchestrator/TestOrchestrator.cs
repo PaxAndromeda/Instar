@@ -12,7 +12,8 @@ using Serilog;
 using Serilog.Events;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using Xunit.Abstractions;
+using Serilog.Sinks.XUnit3;
+using Xunit;
 using InvalidOperationException = Amazon.CloudWatchLogs.Model.InvalidOperationException;
 
 namespace InstarBot.Test.Framework
@@ -111,7 +112,7 @@ namespace InstarBot.Test.Framework
 			Log.Logger = new LoggerConfiguration()
 				.Enrich.FromLogContext()
 				.MinimumLevel.Is(LogEventLevel.Verbose)
-				.WriteTo.TestOutput(testOutputHelper)
+				.WriteTo.XUnit3TestOutput()
 				.CreateLogger()
 				.ForContext<T>();
 			Log.Warning("Logging is enabled for this unit test.");

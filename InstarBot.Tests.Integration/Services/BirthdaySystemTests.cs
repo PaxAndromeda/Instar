@@ -6,7 +6,6 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Services;
 using Serilog;
 using Xunit;
-using Xunit.Abstractions;
 using Metric = PaxAndromeda.Instar.Metrics.Metric;
 
 namespace InstarBot.Tests.Integration.Services;
@@ -75,7 +74,7 @@ public class BirthdaySystemTests
 		var channel = await orchestrator.Discord.GetChannel(orchestrator.Configuration.BirthdayConfig.BirthdayAnnounceChannel) as TestChannel;
 		channel.Should().NotBeNull();
 
-		var messages = await channel.GetMessagesAsync().SelectMany(n => n).ToListAsync();
+		var messages = await channel.GetMessagesAsync().SelectMany(n => n).ToListAsync(TestContext.Current.CancellationToken);
 		messages.Count.Should().BeGreaterThan(0);
 		TestUtilities.MatchesFormat(Strings.Birthday_Announcement, messages[0].Content);
 		
@@ -160,7 +159,7 @@ public class BirthdaySystemTests
 		var channel = await orchestrator.Discord.GetChannel(orchestrator.Configuration.BirthdayConfig.BirthdayAnnounceChannel) as TestChannel;
 		channel.Should().NotBeNull();
 
-		var messages = await channel.GetMessagesAsync().SelectMany(n => n).ToListAsync();
+		var messages = await channel.GetMessagesAsync().SelectMany(n => n).ToListAsync(TestContext.Current.CancellationToken);
 		messages.Count.Should().Be(0);
 	}
 

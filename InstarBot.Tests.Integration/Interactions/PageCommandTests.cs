@@ -7,7 +7,6 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.ConfigModels;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Interactions;
 

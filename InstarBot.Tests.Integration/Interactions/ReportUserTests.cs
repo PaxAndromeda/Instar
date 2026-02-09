@@ -6,7 +6,6 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.Modals;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Interactions;
 

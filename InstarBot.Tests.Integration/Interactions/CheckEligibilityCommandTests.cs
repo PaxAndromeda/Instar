@@ -9,7 +9,6 @@ using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Services;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Interactions;
 

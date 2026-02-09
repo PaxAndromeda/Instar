@@ -3,7 +3,6 @@ using PaxAndromeda.Instar.Commands;
 
 namespace InstarBot.Tests.Integration.Interactions;
 using Xunit;
-using Xunit.Abstractions;
 
 public class PingCommandTests
 {

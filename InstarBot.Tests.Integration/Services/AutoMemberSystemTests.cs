@@ -9,7 +9,6 @@ using PaxAndromeda.Instar.Gaius;
 using PaxAndromeda.Instar.Modals;
 using PaxAndromeda.Instar.Services;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Services;
 

@@ -10,7 +10,6 @@ using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
@@ -155,7 +154,7 @@ public class AutoMemberSystemCommandTests
 
 		// There is a potential asynchronous delay here, so let's keep waiting for this condition for 5 seconds.
 		await Task.WhenAny(
-			Task.Delay(5000),
+			Task.Delay(5000, TestContext.Current.CancellationToken),
 			Task.Factory.StartNew(async () =>
 			{
 				while (true)
@@ -166,7 +165,7 @@ public class AutoMemberSystemCommandTests
 					// only poll once every 50ms
 					await Task.Delay(50);
 				}
-			}));
+			}, TestContext.Current.CancellationToken));
 	}
 
 	[Fact]
