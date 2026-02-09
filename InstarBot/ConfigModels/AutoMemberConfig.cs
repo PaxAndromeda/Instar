@@ -15,7 +15,7 @@ public sealed class AutoMemberConfig
     public int MinimumMessageTime { get; init; }
     public List<RoleGroup> RequiredRoles { get; init; } = null!;
 	public bool EnableGaiusCheck { get; init; }
-	public List<string> AllowedPunishmentReasons { get; init; } = null!;
+	public List<string> AllowedPunishmentReasons { get; init; } = [];
 }
 
 [UsedImplicitly]
