@@ -4,6 +4,7 @@ using InstarBot.Test.Framework.Models;
 using Moq;
 using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Services;
+using Serilog;
 using Xunit;
 using Metric = PaxAndromeda.Instar.Metrics.Metric;
 
@@ -224,6 +225,10 @@ public static class BirthdaySystemTests
 		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
 		dbUser.Should().NotBeNull();
 		dbUser.Data.Birthday!.IsToday.Should().BeTrue();
+		
+		// .IsToday seems to be failing on Github Actions for some reason. Unclear if this is
+		// a parallelization issue or something else.
+		Log.Information("Birthdate: {Birthdate}, Observed: {Observed}, IsToday: {IsToday}", dbUser.Data.Birthday!.Birthdate, dbUser.Data.Birthday!.Observed, dbUser.Data.Birthday!.IsToday);
 
 		orchestrator.Subject.RoleIds.Should().Contain(orchestrator.Configuration.BirthdayConfig.BirthdayRole);
 
