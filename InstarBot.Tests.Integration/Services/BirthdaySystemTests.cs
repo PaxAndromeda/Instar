@@ -224,11 +224,12 @@ public static class BirthdaySystemTests
 		// Pre assert
 		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
 		dbUser.Should().NotBeNull();
-		dbUser.Data.Birthday!.IsToday.Should().BeTrue();
 		
 		// .IsToday seems to be failing on Github Actions for some reason. Unclear if this is
 		// a parallelization issue or something else.
 		Log.Information("Birthdate: {Birthdate}, Observed: {Observed}, IsToday: {IsToday}", dbUser.Data.Birthday!.Birthdate, dbUser.Data.Birthday!.Observed, dbUser.Data.Birthday!.IsToday);
+
+		dbUser.Data.Birthday!.IsToday.Should().BeTrue();
 
 		orchestrator.Subject.RoleIds.Should().Contain(orchestrator.Configuration.BirthdayConfig.BirthdayRole);
 
