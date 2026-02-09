@@ -6,11 +6,17 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.Modals;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public static class ReportUserTests
+public class ReportUserTests
 {
+	public ReportUserTests(ITestOutputHelper testOutputHelper)
+	{
+		TestOrchestrator.SetupLogging<ReportUserTests>(testOutputHelper);
+	}
+
 	private static TestOrchestrator SetupOrchestrator(ReportContext context)
 	{
 		var orchestrator = TestOrchestrator.Default;

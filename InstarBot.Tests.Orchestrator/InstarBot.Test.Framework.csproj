@@ -7,6 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.Core" Version="4.0.3.12" />
+    <PackageReference Include="Serilog.Sinks.XUnit" Version="3.0.19" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\InstarBot.Tests.Common\InstarBot.Tests.Common.csproj" />
   </ItemGroup>
 

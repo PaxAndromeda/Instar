@@ -6,11 +6,17 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.Services;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public static class SetBirthdayCommandTests
+public class SetBirthdayCommandTests
 {
+	public SetBirthdayCommandTests(ITestOutputHelper testOutputHelper)
+	{
+		TestOrchestrator.SetupLogging<SetBirthdayCommandTests>(testOutputHelper);
+	}
+
 	private static async Task<TestOrchestrator> SetupOrchestrator(bool throwError = false)
 	{
 		var orchestrator = TestOrchestrator.Default;

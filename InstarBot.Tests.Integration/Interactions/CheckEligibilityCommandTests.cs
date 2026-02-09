@@ -9,11 +9,17 @@ using PaxAndromeda.Instar.ConfigModels;
 using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Services;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public static class CheckEligibilityCommandTests
+public class CheckEligibilityCommandTests
 {
+	public CheckEligibilityCommandTests(ITestOutputHelper testOutputHelper)
+	{
+		TestOrchestrator.SetupLogging<CheckEligibilityCommandTests>(testOutputHelper);
+	}
+
 	private static TestOrchestrator SetupOrchestrator(MembershipEligibility eligibility)
 	{
 		var orchestrator = TestOrchestrator.Default;

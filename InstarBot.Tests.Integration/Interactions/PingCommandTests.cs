@@ -3,16 +3,22 @@ using PaxAndromeda.Instar.Commands;
 
 namespace InstarBot.Tests.Integration.Interactions;
 using Xunit;
+using Xunit.Abstractions;
 
-public static class PingCommandTests
+public class PingCommandTests
 {
-    /// <summary>
-    /// Tests that the ping command emits an ephemeral "Pong!" response.
-    /// </summary>
-    /// <remarks>This test verifies that calling the ping command results in the
-    /// expected ephemeral "Pong!" response.</remarks>
-    /// <returns></returns>
-    [Fact(DisplayName = "User should be able to issue the Ping command.")]
+	public PingCommandTests(ITestOutputHelper testOutputHelper)
+	{
+		TestOrchestrator.SetupLogging<PingCommandTests>(testOutputHelper);
+	}
+
+	/// <summary>
+	/// Tests that the ping command emits an ephemeral "Pong!" response.
+	/// </summary>
+	/// <remarks>This test verifies that calling the ping command results in the
+	/// expected ephemeral "Pong!" response.</remarks>
+	/// <returns></returns>
+	[Fact(DisplayName = "User should be able to issue the Ping command.")]
     public static async Task PingCommand_Send_ShouldEmitEphemeralPong()
     {
 		// Arrange

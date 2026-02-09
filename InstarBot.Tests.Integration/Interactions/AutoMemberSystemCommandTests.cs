@@ -10,11 +10,17 @@ using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public static class AutoMemberSystemCommandTests
+public class AutoMemberSystemCommandTests
 {
+	public AutoMemberSystemCommandTests(ITestOutputHelper testOutputHelper)
+	{
+		TestOrchestrator.SetupLogging<AutoMemberSystemCommandTests>(testOutputHelper);
+	}
+
 	[Fact]
 	public static async Task HoldMember_WithValidUserAndReason_ShouldCreateRecord()
 	{

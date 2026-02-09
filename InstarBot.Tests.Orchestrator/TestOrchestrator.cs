@@ -12,6 +12,7 @@ using Serilog;
 using Serilog.Events;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using Xunit.Abstractions;
 using InvalidOperationException = Amazon.CloudWatchLogs.Model.InvalidOperationException;
 
 namespace InstarBot.Test.Framework
@@ -59,8 +60,6 @@ namespace InstarBot.Test.Framework
 
 		internal TestOrchestrator(IServiceProvider serviceProvider, Snowflake actor)
 		{
-			SetupLogging();
-
 			_serviceProvider = serviceProvider;
 			_actor = actor;
 
@@ -70,8 +69,6 @@ namespace InstarBot.Test.Framework
 
 		internal TestOrchestrator(IServiceProvider serviceProvider, Snowflake actor, TestGuildUser subject)
 		{
-			SetupLogging();
-
 			_serviceProvider = serviceProvider;
 			_actor = actor;
 
@@ -109,13 +106,14 @@ namespace InstarBot.Test.Framework
 			tdbs.CreateUserAsync(InstarUserData.CreateFrom(user)).Wait();
 		}
 
-		private static void SetupLogging()
+		public static void SetupLogging<T>(ITestOutputHelper testOutputHelper)
 		{
 			Log.Logger = new LoggerConfiguration()
 				.Enrich.FromLogContext()
 				.MinimumLevel.Is(LogEventLevel.Verbose)
-				.WriteTo.Console()
-				.CreateLogger();
+				.WriteTo.TestOutput(testOutputHelper)
+				.CreateLogger()
+				.ForContext<T>();
 			Log.Warning("Logging is enabled for this unit test.");
 		}
 

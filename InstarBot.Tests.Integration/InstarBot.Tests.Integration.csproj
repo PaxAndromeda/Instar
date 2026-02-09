@@ -8,6 +8,7 @@
 
     <ItemGroup>
         <PackageReference Include="Ardalis.GuardClauses" Version="5.0.0" />
+        <PackageReference Include="AWSSDK.Core" Version="4.0.3.12" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
         <PackageReference Include="Moq" Version="4.20.72" />
         <PackageReference Include="MSTest.TestAdapter" Version="4.0.2" />

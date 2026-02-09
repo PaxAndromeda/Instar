@@ -8,11 +8,17 @@ using PaxAndromeda.Instar.DynamoModels;
 using PaxAndromeda.Instar.Metrics;
 using PaxAndromeda.Instar.Services;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Services;
 
-public static class NotificationSystemTests
+public class NotificationSystemTests
 {
+	public NotificationSystemTests(ITestOutputHelper testOutputHelper)
+	{
+		TestOrchestrator.SetupLogging<NotificationSystemTests>(testOutputHelper);
+	}
+
 	private static async Task<TestOrchestrator> SetupOrchestrator()
 	{
 		return await TestOrchestrator.Builder

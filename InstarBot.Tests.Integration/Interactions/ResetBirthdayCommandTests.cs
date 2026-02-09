@@ -6,12 +6,18 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.DynamoModels;
 using Xunit;
+using Xunit.Abstractions;
 using Assert = Xunit.Assert;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public static class ResetBirthdayCommandTests
+public class ResetBirthdayCommandTests
 {
+	public ResetBirthdayCommandTests(ITestOutputHelper testOutputHelper)
+	{
+		TestOrchestrator.SetupLogging<ResetBirthdayCommandTests>(testOutputHelper);
+	}
+
 	private static async Task<TestOrchestrator> SetupOrchestrator(DateTimeOffset? userBirthday = null, bool throwsError = false)
 	{
 		var orchestrator = TestOrchestrator.Default;

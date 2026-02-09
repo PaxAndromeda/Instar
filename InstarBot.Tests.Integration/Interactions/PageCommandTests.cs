@@ -7,14 +7,20 @@ using PaxAndromeda.Instar;
 using PaxAndromeda.Instar.Commands;
 using PaxAndromeda.Instar.ConfigModels;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace InstarBot.Tests.Integration.Interactions;
 
-public static class PageCommandTests
+public class PageCommandTests
 {
 	private const string TestReason = "Test reason for paging";
 
-    private static async Task<TestOrchestrator> SetupOrchestrator(PageCommandTestContext context)
+	public PageCommandTests(ITestOutputHelper testOutputHelper)
+	{
+		TestOrchestrator.SetupLogging<PageCommandTests>(testOutputHelper);
+	}
+
+	private static async Task<TestOrchestrator> SetupOrchestrator(PageCommandTestContext context)
     {
 		var orchestrator = TestOrchestrator.Default;
 
