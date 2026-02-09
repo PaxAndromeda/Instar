@@ -211,8 +211,8 @@ public static class BirthdaySystemTests
 	public static async Task BirthdaySystem_WithUserBirthdayStill_ShouldKeepBirthdayRoles()
 	{
 		// Arrange
-		var birthday = DateTime.Parse("2000-02-13T00:00:00-08:00");
-		var currentTime = DateTime.Parse("2025-02-14T00:00:00Z");
+		var birthday = DateTimeOffset.Parse("2000-02-13T00:00:00-08:00");
+		var currentTime = DateTimeOffset.Parse("2025-02-14T00:00:00Z");
 
 		var orchestrator = await SetupOrchestrator(currentTime, birthday);
 		var system = orchestrator.GetService<IBirthdaySystem>();
