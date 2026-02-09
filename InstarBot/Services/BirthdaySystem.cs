@@ -97,21 +97,6 @@ public sealed class BirthdaySystem (
 				toRemove.Add(user.Data.UserID!);
 				continue;
 			}
-
-			var birthDate = user.Data.Birthday.Birthdate;
-
-			var thisYearBirthday = new DateTime(
-				currentTime.Year,
-				birthDate.Month, birthDate.Day, birthDate.Hour, birthDate.Minute, 0, DateTimeKind.Utc);
-
-			if (thisYearBirthday > currentTime)
-				thisYearBirthday = thisYearBirthday.AddYears(-1);
-
-			if (currentTime - thisYearBirthday >= TimeSpan.FromDays(1))
-			{
-				Log.Information("Removing birthday role from {UserID} due to their birthday not being today.  CurrentTime={CurrentTime}, ThisYearBirthday={ThisYearBirthday}, Diff={TimeDiff}", user.Data.UserID, currentTime, thisYearBirthday, currentTime - thisYearBirthday);
-				toRemove.Add(user.Data.UserID!);
-			}
 		}
 
 		foreach (var snowflake in toRemove)

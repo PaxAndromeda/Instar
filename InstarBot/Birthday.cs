@@ -94,14 +94,8 @@ public record Birthday(DateTimeOffset Birthdate, TimeProvider TimeProvider)
 			var utcOffset = Observed.Offset;
 			var currentLocalTime = dtNow.ToOffset(utcOffset);
 
-			Log.Verbose("utcOffset = {utcOffset}", utcOffset);
-			Log.Verbose("currentLocalTime = {currentLocalTime}", currentLocalTime);
-
 			var localTimeToday = new DateTimeOffset(currentLocalTime.Date, currentLocalTime.Offset);
-			var localTimeTomorrow = localTimeToday.Date.AddDays(1);
-
-			Log.Verbose("localTimeToday = {localTimeToday}", localTimeToday);
-			Log.Verbose("localTimeTomorrow = {localTimeTomorrow}", localTimeTomorrow);
+			var localTimeTomorrow = localTimeToday.AddDays(1);
 
 			return Observed >= localTimeToday && Observed < localTimeTomorrow;
 		}

@@ -211,7 +211,7 @@ public static class BirthdaySystemTests
 	public static async Task BirthdaySystem_WithUserBirthdayStill_ShouldKeepBirthdayRoles()
 	{
 		// Arrange
-		var birthday = DateTime.Parse("2000-02-13T12:00:00Z");
+		var birthday = DateTime.Parse("2000-02-13T00:00:00-08:00");
 		var currentTime = DateTime.Parse("2025-02-14T00:00:00Z");
 
 		var orchestrator = await SetupOrchestrator(currentTime, birthday);
@@ -224,11 +224,6 @@ public static class BirthdaySystemTests
 		// Pre assert
 		var dbUser = await orchestrator.Database.GetUserAsync(orchestrator.Subject.Id);
 		dbUser.Should().NotBeNull();
-		
-		// .IsToday seems to be failing on Github Actions for some reason. Unclear if this is
-		// a parallelization issue or something else.
-		Log.Information("Birthdate: {Birthdate}, Observed: {Observed}, IsToday: {IsToday}", dbUser.Data.Birthday!.Birthdate, dbUser.Data.Birthday!.Observed, dbUser.Data.Birthday!.IsToday);
-
 		dbUser.Data.Birthday!.IsToday.Should().BeTrue();
 
 		orchestrator.Subject.RoleIds.Should().Contain(orchestrator.Configuration.BirthdayConfig.BirthdayRole);
